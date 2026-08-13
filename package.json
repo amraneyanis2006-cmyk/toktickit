@@ -1,31 +1,21 @@
 {
-  "name": "toktickit",
+  "name": "toktickit-root",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "directories": {
-    "test": "tests"
-  },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/amraneyanis2006-cmyk/toktickit.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/amraneyanis2006-cmyk/toktickit/issues"
-  },
-  "homepage": "https://github.com/amraneyanis2006-cmyk/toktickit#readme",
+  "private": true,
+  "type": "module",
   "devDependencies": {
-    "@types/node": "^26.2.0",
-    "@types/supertest": "^7.2.1",
-    "supertest": "^7.2.2",
-    "typescript": "^7.0.2",
-    "vitest": "^4.1.10"
+    "@types/node": "^20.0.0",
+    "@types/supertest": "^6.0.0",
+    "supertest": "^6.3.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "prisma": "^5.22.0"
+  },
+  "prisma": {
+    "seed": "npx ts-node --esm prisma/seed.ts"
   }
 }
