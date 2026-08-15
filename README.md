@@ -1,6 +1,6 @@
 # TokTickIT
 
-TokTickIT (ตอกติ๊กกิต) is an IT service desk application for Account and Access, Hardware, Software, and Network requests. This repository contains the Lab 1 full-stack vertical slice for CPE 334 — Introduction to Software Engineering in the Age of AI Agents.
+TokTickIT is an IT service desk application for Account and Access, Hardware, Software, and Network requests. This repository contains the Lab 1 full-stack vertical slice for CPE 334 — Introduction to Software Engineering in the Age of AI Agents.
 
 **Lab 1 goal:** prove that the full technology stack works end-to-end — React UI → Express REST API → Prisma ORM → PostgreSQL DB — by displaying a live backend health check and the four seeded IT request categories.
 
