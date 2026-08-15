@@ -28,7 +28,7 @@ export default function App() {
       if (!catRes.ok) throw new Error('Unable to fetch categories');
       const catData = await catRes.json();
 
-      setSystemStatus(healthData.status === 'ok' ? 'Système : ok' : 'Système : warning');
+      setSystemStatus(healthData.status === 'ok' ? 'System Status: Online' : 'System Status: Warning');
       setCategories(catData);
     } catch (err: any) {
       setError('Unable to connect to TokTickIT API');
@@ -70,7 +70,7 @@ export default function App() {
             ✅ {systemStatus}
           </p>
           <h3 style={{ marginTop: '1.5rem', marginBottom: '0.8rem', fontWeight: 'bold' }}>
-            Catégories supportées :
+            Supported Request Categories:
           </h3>
           <ul style={{ paddingLeft: '1.5rem', lineHeight: '1.8' }}>
             {categories.map((cat) => (
