@@ -1,0 +1,11 @@
+# AI Usage Log (`ai_use.md`)
+
+| Prompt # / Stage | Objective / Key Prompt | AI Output & Assistance | Human Oversight & Reflection |
+| :--- | :--- | :--- | :--- |
+| **01. Foundation** | Initialize TokTickIT project stack with Express, React (Vite), TypeScript, and Git structure. | Provided base project architecture, folder structure, and setup scripts. | Adjusted `package.json` configurations and ensured proper ES Module (`type: module`) settings across client and server. |
+| **02. Health Check** | Create `GET /api/health` endpoint and automated Supertest integration test. | Generated Express route handler returning `{ status: 'ok', service: 'TokTickIT API' }` and Vitest test file. | Verified route functionality and executed tests directly in the terminal on the first run. |
+| **03. Prisma & PostgreSQL** | Define `Category` model in Prisma and run database migrations. | Generated `schema.prisma` model definition and migration commands. | Diagnosed and resolved PostgreSQL authentication errors (`P1010`) and `.env` credentials on macOS/Homebrew. |
+| **04. Database Seeding** | Implement an idempotent seed script using `prisma.category.upsert()` for the 4 default categories. | Provided `seed.ts` script with `upsert` logic to prevent duplicate record insertion. | Resolved TypeScript execution issues with Node.js ESM loaders (`ts-node/esm` / `tsx`). |
+| **05. Categories API** | Build `GET /api/categories` endpoint and corresponding integration test suite. | Implemented Prisma query fetching categories sorted by ID and added Vitest/Supertest assertions. | Ran `npx vitest run` to ensure all backend integration tests passed with 100% success. |
+| **06. Frontend UI** | Connect React frontend (`App.tsx`) to the category API with proper UI states. | Built React component handling asynchronous `fetch()`, loading, error, and list rendering. | Tested user interface rendering live in the browser on `http://localhost:5173`. |
+| **07. Git & Kanban** | Review Pull Requests and validate Kanban lifecycle state transitions. | Formatted Git commands for branch creation, PR submission (`Closes #<id>`), and staging merge. | Verified on GitHub that all 4 PRs were cleanly merged into `lab1-staging` and all issues moved to `Done`. |
