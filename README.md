@@ -150,4 +150,3 @@ See `.env.example` in `server/` for the required variables. Never commit `.env` 
 ## License
 
 Educational project for CPE 334, King Mongkut's University of Technology Thonburi (KMUTT).
-
