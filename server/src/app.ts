@@ -16,15 +16,37 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Endpoint Categories (Issue #4 — Lab 1)
+// Endpoint Categories (Issue #4 — Lab 1, updated Issue #4 — Lab 2 to filter isActive)
 app.get('/api/categories', async (req, res) => {
   try {
     const categories = await prisma.category.findMany({
+      where: { isActive: true },
       orderBy: { id: 'asc' },
+      select: { id: true, name: true },
     });
     res.status(200).json(categories);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch categories' });
+    res.status(500).json({
+      error: 'INTERNAL_ERROR',
+      message: 'Unable to load categories.',
+    });
+  }
+});
+
+// Endpoint Related Systems (Issue #4 — Lab 2)
+app.get('/api/related-systems', async (req, res) => {
+  try {
+    const relatedSystems = await prisma.relatedSystem.findMany({
+      where: { isActive: true },
+      orderBy: { id: 'asc' },
+      select: { id: true, name: true },
+    });
+    res.status(200).json(relatedSystems);
+  } catch (error) {
+    res.status(500).json({
+      error: 'INTERNAL_ERROR',
+      message: 'Unable to load related systems.',
+    });
   }
 });
 
