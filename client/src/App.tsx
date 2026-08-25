@@ -5,6 +5,7 @@ import AppShell from './components/AppShell';
 import RequesterSelection from './pages/RequesterSelection';
 import MyTickets from './pages/MyTickets';
 import CreateTicket from './pages/CreateTicket';
+import TicketDetail from './pages/TicketDetail';
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
             <Route element={<AppShell />}>
               <Route path="/tickets" element={<MyTickets />} />
               <Route path="/tickets/new" element={<CreateTicket />} />
+              <Route path="/tickets/:ticketNumber" element={<TicketDetail />} />
             </Route>
           </Route>
 
