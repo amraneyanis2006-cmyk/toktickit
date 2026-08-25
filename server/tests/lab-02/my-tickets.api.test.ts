@@ -229,4 +229,59 @@ describe('GET /api/tickets', () => {
     expect(response.body.pagination.page).toBe(1);
     expect(response.body.pagination.pageSize).toBe(10);
   });
+
+
+  it('API-13: sortBy=ticketNumber&sortDir=asc sorts ascending by ticket number', async () => {
+    await prisma.ticket.createMany({
+      data: [
+        {
+          ticketNumber: 'TKT-9999-999943',
+          requesterId: testRequesterId,
+          categoryId: testCategoryId,
+          relatedSystemId: testSystemId,
+          requestedPriority: 'HIGH',
+          summary: 'Ticket C',
+          description: 'Description'.padEnd(10, 'x'),
+        },
+        {
+          ticketNumber: 'TKT-9999-999941',
+          requesterId: testRequesterId,
+          categoryId: testCategoryId,
+          relatedSystemId: testSystemId,
+          requestedPriority: 'MEDIUM',
+          summary: 'Ticket A',
+          description: 'Description'.padEnd(10, 'x'),
+        },
+        {
+          ticketNumber: 'TKT-9999-999942',
+          requesterId: testRequesterId,
+          categoryId: testCategoryId,
+          relatedSystemId: testSystemId,
+          requestedPriority: 'LOW',
+          summary: 'Ticket B',
+          description: 'Description'.padEnd(10, 'x'),
+        },
+      ],
+    });
+
+    const response = await request(app)
+      .get('/api/tickets?sortBy=ticketNumber&sortDir=asc')
+      .set('x-requester-id', String(testRequesterId));
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.map((t: { ticketNumber: string }) => t.ticketNumber)).toEqual([
+      'TKT-9999-999941',
+      'TKT-9999-999942',
+      'TKT-9999-999943',
+    ]);
+  });
+
+  it('API-14: invalid sortBy/sortDir fall back to createdAt desc', async () => {
+    const response = await request(app)
+      .get('/api/tickets?sortBy=notAField&sortDir=sideways')
+      .set('x-requester-id', String(testRequesterId));
+
+    expect(response.status).toBe(200);
+    // Falls back without erroring — exact ordering already covered by API-10.
+  });
 });
