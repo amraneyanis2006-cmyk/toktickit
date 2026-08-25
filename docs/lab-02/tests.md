@@ -75,7 +75,7 @@ No planned test may be skipped, disabled, or `.only`-marked in the final `main` 
 | UI-09 | UI | AC-09/AC-10 | My Tickets empty vs. no-results | Renders distinct copy/CTA for zero-tickets-ever vs. filtered-to-zero | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
 | UI-10 | UI | AC-11 | My Tickets pagination controls | Clicking "Next" requests `page=2`; page indicator updates | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
 | UI-11 | UI | BR-09/BR-10 | My Tickets search + filter interaction | Typing in search and choosing a filter both trigger a re-fetch with correct query params | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
-| UI-12 | UI | AC-12 | Ticket Detail remove attachment flow | Confirmation modal requires a reason; on confirm, row updates to "Removed" and download is disabled | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Pending |
+| UI-12 | UI | AC-12 | Ticket Detail remove attachment flow | Falls back to `page=1`, `pageSize=10` rather than erroring (pageSize valid range is 1–100) | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Pending |
 | UI-13 | UI | BR-05 | Ticket Detail IT Priority display | Renders "Not set" when `itPriority` is `null` | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Pending |
 | UI-14 | UI | FR-12/AC-06 | Attachment section enforces 5-file cap in the UI | "Add Attachment" control disables / shows message at 5 active attachments | `client/tests/lab-02/AttachmentSection.test.tsx` | Pending |
 
