@@ -1,74 +1,20 @@
 import express from 'express';
 import cors from 'cors';
-import { PrismaClient } from '@prisma/client';
+import healthRouter from './routes/health';
+import categoriesRouter from './routes/categories';
+import systemsRouter from './routes/relatedSystems';
+import requestersRouter from './routes/requesters';
+import ticketsRouter from './routes/tickets';
 
 const app = express();
-const prisma = new PrismaClient();
 
 app.use(cors());
 app.use(express.json());
 
-// Endpoint Health Check (Issue #2 — Lab 1)
-app.get('/api/health', (req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    service: 'TokTickIT API',
-  });
-});
-
-// Endpoint Categories (Issue #4 — Lab 1, updated Issue #4 — Lab 2 to filter isActive)
-app.get('/api/categories', async (req, res) => {
-  try {
-    const categories = await prisma.category.findMany({
-      where: { isActive: true },
-      orderBy: { id: 'asc' },
-      select: { id: true, name: true },
-    });
-    res.status(200).json(categories);
-  } catch (error) {
-    res.status(500).json({
-      error: 'INTERNAL_ERROR',
-      message: 'Unable to load categories.',
-    });
-  }
-});
-
-// Endpoint Related Systems (Issue #4 — Lab 2)
-app.get('/api/related-systems', async (req, res) => {
-  try {
-    const relatedSystems = await prisma.relatedSystem.findMany({
-      where: { isActive: true },
-      orderBy: { id: 'asc' },
-      select: { id: true, name: true },
-    });
-    res.status(200).json(relatedSystems);
-  } catch (error) {
-    res.status(500).json({
-      error: 'INTERNAL_ERROR',
-      message: 'Unable to load related systems.',
-    });
-  }
-});
-
-// Endpoint Development Requesters (Issue #3 — Lab 2)
-// Returns only ACTIVE requesters (BR-06); this is the list shown on the
-// Development Requester Selection screen. It is intentionally NOT protected
-// by requireActiveRequester, since selecting a requester is how identity is
-// first established.
-app.get('/api/requesters', async (req, res) => {
-  try {
-    const requesters = await prisma.requesterUser.findMany({
-      where: { isActive: true },
-      orderBy: { name: 'asc' },
-      select: { id: true, name: true, email: true },
-    });
-    res.status(200).json(requesters);
-  } catch (error) {
-    res.status(500).json({
-      error: 'INTERNAL_ERROR',
-      message: 'Unable to load requesters.',
-    });
-  }
-});
+app.use('/api', healthRouter);
+app.use('/api', categoriesRouter);
+app.use('/api', systemsRouter);
+app.use('/api', requestersRouter);
+app.use('/api', ticketsRouter);
 
 export default app;

@@ -135,7 +135,7 @@ Retrieve the current Requester's own Tickets with search, filter, sort, and pagi
 | `sortBy` | `createdAt\|ticketNumber\|updatedAt` | `createdAt` | Invalid value falls back to default (BR-12 pattern) |
 | `sortDir` | `asc\|desc` | `desc` | Invalid value falls back to `desc` |
 | `page` | int ≥ 1 | `1` | Invalid/out-of-range falls back to `1` |
-| `pageSize` | `10\|20\|50` | `10` | Any other value falls back to `10` |
+| `pageSize` | int, 1–100 | `10` | Non-integer or out-of-range (< 1 or > 100) falls back to `10` |
 
 - **Success — 200**
 ```json

@@ -114,3 +114,8 @@ model Attachment {
 
   @@index([ticketId])
 }
+
+model TicketSequence {
+  year     Int @id
+  lastSeq  Int @default(0)
+}
