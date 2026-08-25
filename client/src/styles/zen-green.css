@@ -142,3 +142,32 @@ body {
   box-shadow: 0 0 0 2px rgba(11, 122, 70, 0.25);
   border-color: var(--zg-focus-ring);
 }
+
+/* Priority / Status badges (ui-spec.md §5) */
+.zg-badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.zg-badge-priority-low,
+.zg-badge-status-new,
+.zg-badge-status-resolved {
+  background-color: var(--zg-pale);
+  color: var(--zg-secondary);
+}
+.zg-badge-priority-medium,
+.zg-badge-status-in_progress {
+  background-color: #FDF3D8;
+  color: var(--zg-warning);
+}
+.zg-badge-priority-high {
+  background-color: var(--zg-error-bg);
+  color: var(--zg-error);
+}
+.zg-badge-status-open {
+  background-color: #E7F0FA;
+  color: #1F5F9C;
+}

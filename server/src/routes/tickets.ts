@@ -146,6 +146,16 @@ router.get('/tickets', requireActiveRequester, async (req: Request, res: Respons
 
     const skip = (page - 1) * pageSize;
 
+    // TRI
+    const allowedSortFields = ['createdAt', 'ticketNumber', 'updatedAt'];
+    let sortBy = req.query.sortBy as string;
+    if (!allowedSortFields.includes(sortBy)) sortBy = 'createdAt';
+
+    let sortDir = req.query.sortDir as string;
+    if (sortDir !== 'asc' && sortDir !== 'desc') sortDir = 'desc';
+
+    // RECHERCHE
+
     // RECHERCHE
     const search = req.query.search as string || '';
     const categoryId = req.query.category ? Number(req.query.category) : undefined;
@@ -170,7 +180,7 @@ router.get('/tickets', requireActiveRequester, async (req: Request, res: Respons
     const [tickets, totalItems] = await Promise.all([
       prisma.ticket.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { [sortBy]: sortDir },
         skip: skip,
         take: pageSize,
         select: {
