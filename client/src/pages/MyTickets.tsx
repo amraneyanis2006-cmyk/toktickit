@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { apiFetch, ApiError } from '../api/apiClient';
 import { useRequester } from '../context/RequesterContext';
 
@@ -42,7 +42,7 @@ function StatusBadge({ value }: { value: string }) {
 
 export default function MyTickets() {
   const { requester } = useRequester();
-
+  const navigate = useNavigate();
   const [categories, setCategories] = useState<RefItem[]>([]);
 
   const [search, setSearch] = useState('');
@@ -266,7 +266,11 @@ export default function MyTickets() {
               </thead>
               <tbody>
                 {result.data.map((t) => (
-                  <tr key={t.id}>
+                  <tr
+                    key={t.id}
+                    onClick={() => navigate(`/tickets/${t.ticketNumber}`)}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <td className="fw-semibold">{t.ticketNumber}</td>
                     <td>{formatDate(t.createdAt)}</td>
                     <td>{t.summary}</td>
@@ -283,7 +287,12 @@ export default function MyTickets() {
           {/* Mobile cards */}
           <div className="d-md-none d-flex flex-column gap-3">
             {result.data.map((t) => (
-              <div key={t.id} className="zg-card p-3">
+              <div
+                key={t.id}
+                className="zg-card p-3"
+                onClick={() => navigate(`/tickets/${t.ticketNumber}`)}
+                style={{ cursor: 'pointer' }}
+              >
                 <div className="d-flex justify-content-between align-items-center mb-2">
                   <span className="fw-semibold">{t.ticketNumber}</span>
                   <StatusBadge value={t.currentStatus} />
