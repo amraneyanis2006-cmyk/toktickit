@@ -171,3 +171,12 @@ body {
   background-color: #E7F0FA;
   color: #1F5F9C;
 }
+
+/* Ensure tap targets meet the 44px WCAG guideline on mobile (<768px) */
+@media (max-width: 767.98px) {
+  .zg-card .btn.btn-sm {
+    min-height: 44px;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+}
