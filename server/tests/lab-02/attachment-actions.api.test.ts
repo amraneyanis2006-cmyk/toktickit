@@ -63,8 +63,8 @@ describe('Attachment download & remove', () => {
     await prisma.$disconnect();
   });
 
-  it('API-19: downloads an active attachment with 200, correct headers and body', async () => {
-    const res = await request(app)
+  it('downloads an active attachment with 200, correct headers and body', async () => {
+        const res = await request(app)
       .get(`/api/attachments/${activeAttachmentId}/download`)
       .set('x-requester-id', String(requesterA.id));
 
@@ -74,8 +74,8 @@ describe('Attachment download & remove', () => {
     expect(res.body.toString()).toBe('fake-image-content');
   });
 
-  it('API-20: returns 404 when downloading with a different Requester', async () => {
-    const res = await request(app)
+  it('returns 404 when downloading with a different Requester', async () => {
+        const res = await request(app)
       .get(`/api/attachments/${activeAttachmentId}/download`)
       .set('x-requester-id', String(requesterB.id));
 
@@ -83,8 +83,8 @@ describe('Attachment download & remove', () => {
     expect(res.body.error).toBe('NOT_FOUND');
   });
 
-  it('API-21: rejects remove with a reason under 3 characters (400)', async () => {
-    const res = await request(app)
+  it('rejects remove with a reason under 3 characters (400)', async () => {
+        const res = await request(app)
       .patch(`/api/attachments/${activeAttachmentId}/remove`)
       .set('x-requester-id', String(requesterA.id))
       .send({ reason: 'ab' });
@@ -93,8 +93,8 @@ describe('Attachment download & remove', () => {
     expect(res.body.error).toBe('VALIDATION_ERROR');
   });
 
-  it('API-22: soft-removes an active attachment with 200', async () => {
-    const res = await request(app)
+  it('soft-removes an active attachment with 200', async () => {
+        const res = await request(app)
       .patch(`/api/attachments/${activeAttachmentId}/remove`)
       .set('x-requester-id', String(requesterA.id))
       .send({ reason: 'Wrong file uploaded.' });
@@ -105,8 +105,8 @@ describe('Attachment download & remove', () => {
     expect(res.body.removedAt).toBeTruthy();
   });
 
-  it('API-23: returns 409 ALREADY_REMOVED on a second remove attempt', async () => {
-    const res = await request(app)
+  it('returns 409 ALREADY_REMOVED on a second remove attempt', async () => {
+        const res = await request(app)
       .patch(`/api/attachments/${activeAttachmentId}/remove`)
       .set('x-requester-id', String(requesterA.id))
       .send({ reason: 'Trying again.' });
@@ -115,8 +115,8 @@ describe('Attachment download & remove', () => {
     expect(res.body.error).toBe('ALREADY_REMOVED');
   });
 
-  it('API-24: returns 404 when downloading a removed attachment (BR-21)', async () => {
-    const res = await request(app)
+  it('API-22: returns 404 when downloading a removed attachment (BR-21)', async () => {
+  const res = await request(app)
       .get(`/api/attachments/${activeAttachmentId}/download`)
       .set('x-requester-id', String(requesterA.id));
 

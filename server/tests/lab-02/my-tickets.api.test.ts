@@ -231,8 +231,8 @@ describe('GET /api/tickets', () => {
   });
 
 
-  it('API-13: sortBy=ticketNumber&sortDir=asc sorts ascending by ticket number', async () => {
-    await prisma.ticket.createMany({
+  it('sortBy=ticketNumber&sortDir=asc sorts ascending by ticket number', async () => {
+      await prisma.ticket.createMany({
       data: [
         {
           ticketNumber: 'TKT-9999-999943',
@@ -276,8 +276,8 @@ describe('GET /api/tickets', () => {
     ]);
   });
 
-  it('API-14: invalid sortBy/sortDir fall back to createdAt desc', async () => {
-    const response = await request(app)
+  it('invalid sortBy/sortDir fall back to createdAt desc', async () => {
+        const response = await request(app)
       .get('/api/tickets?sortBy=notAField&sortDir=sideways')
       .set('x-requester-id', String(testRequesterId));
 

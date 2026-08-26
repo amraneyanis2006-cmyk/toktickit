@@ -60,8 +60,8 @@ describe('requireActiveRequester middleware', () => {
     expect(res.body.error).toBe('INVALID_REQUESTER');
   });
 
-  it('API-06 pattern: x-requester-id referencing an inactive requester -> 403 REQUESTER_INACTIVE', async () => {
-    const inactive = await prisma.requesterUser.findFirst({ where: { isActive: false } });
+  it('x-requester-id referencing an inactive requester -> 403 REQUESTER_INACTIVE (on GET /api/requesters)', async () => {
+  const inactive = await prisma.requesterUser.findFirst({ where: { isActive: false } });
     expect(inactive).not.toBeNull();
 
     const res = await request(testApp)
