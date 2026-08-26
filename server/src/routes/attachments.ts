@@ -134,4 +134,119 @@ router.post(
   }
 );
 
+// ──────────────────────────────────────────────
+// GET /api/attachments/:id/download - Télécharger un attachment actif
+// ──────────────────────────────────────────────
+router.get('/attachments/:id/download', requireActiveRequester, async (req: Request, res: Response) => {
+  try {
+    const requesterId = req.requester!.id;
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id)) {
+      return res.status(404).json({
+        error: 'NOT_FOUND',
+        message: 'Attachment not found.',
+      });
+    }
+
+    const attachment = await prisma.attachment.findFirst({
+      where: {
+        id,
+        isRemoved: false, // BR-21: removed attachment is indistinguishable from nonexistent here
+        ticket: { requesterId },
+      },
+    });
+
+    if (!attachment) {
+      return res.status(404).json({
+        error: 'NOT_FOUND',
+        message: 'Attachment not found.',
+      });
+    }
+
+    const filePath = path.join(UPLOADS_DIR, attachment.storedFileName);
+    const fileBuffer = await fs.readFile(filePath);
+
+    res.setHeader('Content-Type', attachment.mimeType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${attachment.originalFileName.replace(/"/g, '')}"`
+    );
+    res.send(fileBuffer);
+
+  } catch (error) {
+    console.error('Error downloading attachment:', error);
+    res.status(500).json({
+      error: 'DOWNLOAD_FAILED',
+      message: 'Unable to download attachment.',
+    });
+  }
+});
+
+// ──────────────────────────────────────────────
+// PATCH /api/attachments/:id/remove - Soft-remove d'un attachment actif
+// ──────────────────────────────────────────────
+router.patch('/attachments/:id/remove', requireActiveRequester, async (req: Request, res: Response) => {
+  try {
+    const requesterId = req.requester!.id;
+    const id = Number(req.params.id);
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+
+    if (reason.length < 3) {
+      return res.status(400).json({
+        error: 'VALIDATION_ERROR',
+        fields: { reason: 'A removal reason of at least 3 characters is required.' },
+      });
+    }
+
+    if (!Number.isInteger(id)) {
+      return res.status(404).json({
+        error: 'NOT_FOUND',
+        message: 'Attachment not found.',
+      });
+    }
+
+    const attachment = await prisma.attachment.findFirst({
+      where: { id, ticket: { requesterId } },
+    });
+
+    if (!attachment) {
+      return res.status(404).json({
+        error: 'NOT_FOUND',
+        message: 'Attachment not found.',
+      });
+    }
+
+    if (attachment.isRemoved) {
+      return res.status(409).json({
+        error: 'ALREADY_REMOVED',
+        message: 'This attachment has already been removed.',
+      });
+    }
+
+    const updated = await prisma.attachment.update({
+      where: { id },
+      data: {
+        isRemoved: true,
+        removedAt: new Date(),
+        removalReason: reason,
+      },
+    });
+
+    res.status(200).json({
+      id: updated.id,
+      isRemoved: updated.isRemoved,
+      removedAt: updated.removedAt,
+      removalReason: updated.removalReason,
+    });
+
+  } catch (error) {
+    console.error('Error removing attachment:', error);
+    res.status(500).json({
+      error: 'REMOVE_FAILED',
+      message: 'Unable to remove attachment.',
+    });
+  }
+});
+
 export default router;
