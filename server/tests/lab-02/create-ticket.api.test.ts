@@ -10,6 +10,8 @@ describe('POST /api/tickets', () => {
   let testCategoryId: number;
   let testSystemId: number;
 
+  let inactiveRequesterId: number;
+
   beforeAll(async () => {
     // Récupérer un requester actif, une catégorie, et un système pour les tests
     const requester = await prisma.requesterUser.findFirst({
@@ -25,6 +27,16 @@ describe('POST /api/tickets', () => {
     testRequesterId = requester!.id;
     testCategoryId = category!.id;
     testSystemId = system!.id;
+
+    const inactiveRequester = await prisma.requesterUser.create({
+      data: { name: 'Inactive Test Requester', email: `inactive-${Date.now()}@test.local`, isActive: false },
+    });
+    inactiveRequesterId = inactiveRequester.id;
+  });
+
+  afterAll(async () => {
+    await prisma.requesterUser.delete({ where: { id: inactiveRequesterId } });
+    await prisma.$disconnect();
   });
 
   it('API-01: should create a ticket with valid data', async () => {
@@ -75,5 +87,26 @@ describe('POST /api/tickets', () => {
 
     expect(response.status).toBe(401);
     expect(response.body.error).toBe('MISSING_REQUESTER');
+  });
+
+  it('API-06: rejects Ticket creation for an inactive Requester, no Ticket created', async () => {
+    const countBefore = await prisma.ticket.count({ where: { requesterId: inactiveRequesterId } });
+
+    const response = await request(app)
+      .post('/api/tickets')
+      .set('x-requester-id', String(inactiveRequesterId))
+      .send({
+        categoryId: testCategoryId,
+        relatedSystemId: testSystemId,
+        requestedPriority: 'MEDIUM',
+        summary: 'Should not be created',
+        description: 'This request must be rejected before persistence.',
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('REQUESTER_INACTIVE');
+
+    const countAfter = await prisma.ticket.count({ where: { requesterId: inactiveRequesterId } });
+    expect(countAfter).toBe(countBefore); // BR-25: no Ticket created
   });
 });
