@@ -68,6 +68,8 @@ export default function TicketDetail() {
   const [uploadState, setUploadState] = useState<UploadState>('idle');
   const [uploadError, setUploadError] = useState('');
 
+  const [removingId, setRemovingId] = useState<number | null>(null);
+  const [removeError, setRemoveError] = useState('');
   const loadTicket = async () => {
     setFetchState('loading');
     try {
@@ -127,6 +129,49 @@ export default function TicketDetail() {
 
     setUploadState('idle');
     await loadTicket(); // refresh the attachment list in place
+  };
+
+  const handleDownload = async (attachmentId: number, filename: string) => {
+    try {
+      const res = await fetch(`http://localhost:3000/api/attachments/${attachmentId}/download`, {
+        headers: requester?.id ? { 'x-requester-id': String(requester.id) } : {},
+      });
+      if (!res.ok) throw new Error('Download failed');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setRemoveError('Unable to download this file.');
+    }
+  };
+
+  const handleRemove = async (attachmentId: number) => {
+    const reason = window.prompt('Why are you removing this attachment? (min. 3 characters)');
+    if (reason === null) return; // user cancelled
+
+    if (reason.trim().length < 3) {
+      setRemoveError('A removal reason of at least 3 characters is required.');
+      return;
+    }
+
+    setRemoveError('');
+    setRemovingId(attachmentId);
+    try {
+      await apiFetch(`/attachments/${attachmentId}/remove`, {
+        method: 'PATCH',
+        requesterId: requester?.id,
+        body: JSON.stringify({ reason: reason.trim() }),
+      });
+      await loadTicket();
+    } catch (err) {
+      setRemoveError(err instanceof ApiError ? err.message : 'Unable to remove this attachment.');
+    } finally {
+      setRemovingId(null);
+    }
   };
 
   if (fetchState === 'loading') {
@@ -215,6 +260,7 @@ export default function TicketDetail() {
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h2 className="h6 mb-0">Attachments ({ticket.attachments.length})</h2>
       </div>
+      {removeError && <div className="zg-field-error mb-3">{removeError}</div>}
 
       <div className="mb-3">
         <input
@@ -255,12 +301,23 @@ export default function TicketDetail() {
                 >
                   {a.isRemoved ? 'Removed' : 'Active'}
                 </span>
-                <button type="button" className="btn btn-sm btn-zg-secondary" disabled title="Coming in Issue #9">
-                  Download
-                </button>
                 {!a.isRemoved && (
-                  <button type="button" className="btn btn-sm btn-zg-tertiary" disabled title="Coming in Issue #9">
-                    Remove
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-zg-secondary"
+                    onClick={() => handleDownload(a.id, a.originalFileName)}
+                  >
+                    Download
+                  </button>
+                )}
+                {!a.isRemoved && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-zg-tertiary"
+                    disabled={removingId === a.id}
+                    onClick={() => handleRemove(a.id)}
+                  >
+                    {removingId === a.id ? 'Removing…' : 'Remove'}
                   </button>
                 )}
               </div>
