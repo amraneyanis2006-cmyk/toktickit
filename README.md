@@ -13,7 +13,6 @@ TokTickIT is an IT service desk application for Account and Access, Hardware, So
 | Database | PostgreSQL + Prisma ORM |
 | Testing | Vitest (frontend) + Supertest (backend API) |
 
-
 ## Prerequisites
 
 - Node.js (v18 or later)
@@ -75,8 +74,8 @@ The app will be available at `http://localhost:5173`.
 1. Open `http://localhost:5173` in your browser.
 2. Click **Check System**.
 3. The page will show a loading state, then either:
-   - **System Status: Online** and the four supported categories, or
-   - **System Status: Offline** with an error message if the backend/database is unavailable.
+- **System Status: Online** and the four supported categories, or
+- **System Status: Offline** with an error message if the backend/database is unavailable.
 
 ## API Endpoints
 
@@ -88,8 +87,8 @@ GET /api/health
 
 ```json
 {
-  "status": "ok",
-  "service": "TokTickIT API"
+"status": "ok",
+"service": "TokTickIT API"
 }
 ```
 
@@ -146,6 +145,70 @@ See the [GitHub Project board](https://github.com/users/amraneyanis2006-cmyk/pro
 ## Environment Variables
 
 See `.env.example` in `server/` for the required variables. Never commit `.env` — it is excluded via `.gitignore`.
+
+---
+
+# Lab 2 — Requester Ticketing MVP
+
+Lab 2 extends the Lab 1 vertical slice into a full Requester-facing ticketing experience: Development Requester selection (testing-only identity), ticket creation with attachments, a searchable/filterable/sortable/paginated My Tickets list, a read-only Ticket Detail screen, and the attachment lifecycle (add / soft-remove).
+
+Full contract documents: [`docs/lab-02/specification.md`](docs/lab-02/specification.md), [`docs/lab-02/api-spec.md`](docs/lab-02/api-spec.md), [`docs/lab-02/ui-spec.md`](docs/lab-02/ui-spec.md), [`docs/lab-02/tests.md`](docs/lab-02/tests.md).
+
+## Tech Stack (Lab 2 additions)
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 19 + Vite + TypeScript + Bootstrap 5 + React Router v7 |
+| Backend | Node.js + Express 5 + TypeScript |
+| Database | PostgreSQL + Prisma 7 |
+| Testing | Vitest + Supertest (backend) · Vitest + Testing Library (frontend) · Playwright (E2E, responsive, visual — Chromium only) |
+
+## Setup (clean clone)
+
+The Lab 1 setup steps above still apply (clone, `npm install` in `server/` and `client/`, copy `.env`). No new environment variables were introduced in Lab 2 — the same `DATABASE_URL` and `PORT` from `.env.example` are sufficient:
+
+```
+DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/toktickit_db?schema=public"
+PORT=3000
+```
+
+Run migrations and seed the Lab 2 data (Categories, Related Systems, Development Requesters — including one intentionally inactive Requester for BR-06/AC-15 testing):
+
+```bash
+cd server
+npx prisma migrate dev
+npx prisma db seed
+npm run dev
+```
+
+Attachment storage (`server/uploads/`) requires no manual setup — the directory is created automatically on first upload (`fs.mkdir(..., { recursive: true })`) and its contents are gitignored; only `server/uploads/.gitignore` itself is tracked.
+
+Start the frontend as in Lab 1 (`cd client && npm install && npm run dev`), then open `http://localhost:5173`, select a Development Requester, and use the app.
+
+## Running Tests (Lab 2)
+
+```bash
+# Backend unit + API tests
+cd server && npx vitest run
+
+# Frontend component tests
+cd client && npx vitest run
+
+# End-to-end + responsive + visual tests (Playwright, Chromium only)
+npx playwright test e2e/lab-02
+```
+
+All three commands must exit with zero failures, with zero skipped or `.only`/`.skip`-marked tests, per the Lab 2 Definition of Done ([`docs/lab-02/specification.md`](docs/lab-02/specification.md) §10). See [`docs/lab-02/tests.md`](docs/lab-02/tests.md) for the full test plan, per-test traceability to Acceptance Criteria, and final results.
+
+## Git Workflow (Lab 2)
+
+Lab 2 follows the same Git Flow-style model as Lab 1, scoped to its own staging branch:
+
+- `main` — stable, production-like branch
+- `lab2-staging` — Lab 2 integration branch
+- `feature/N-name` — one feature branch per GitHub Issue, merged into `lab2-staging` via peer-reviewed Pull Requests
+
+See [`docs/lab-02/reviewer.md`](docs/lab-02/reviewer.md) for peer review records and [`docs/lab-02/ai_use.md`](docs/lab-02/ai_use.md) for the AI usage log.
 
 ## License
 
