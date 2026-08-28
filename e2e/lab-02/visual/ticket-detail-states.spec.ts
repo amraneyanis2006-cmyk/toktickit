@@ -1,6 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { selectRequester } from '../../helpers';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const filePath = path.join(__dirname, '../fixtures/test-image.png');
 
 test.describe('Ticket Detail screenshot states (desktop)', () => {
   test.beforeEach(async ({ page }) => {
@@ -24,7 +28,7 @@ test.describe('Ticket Detail screenshot states (desktop)', () => {
     await page.locator('tbody tr').first().click();
     await page.waitForURL('**/tickets/TKT-*');
 
-    const filePath = path.join(process.cwd(), 'e2e/lab-02/fixtures/test-image.png');
+    const filePath = path.join(__dirname, '../fixtures/test-image.png');
     const activeCount = await page.locator('.zg-badge-status-open').count();
     if (activeCount === 0) {
       await page.setInputFiles('input[type="file"]', filePath);
@@ -44,7 +48,7 @@ test.describe('Ticket Detail screenshot states (desktop)', () => {
     await page.locator('tbody tr').first().click();
     await page.waitForURL('**/tickets/TKT-*');
 
-    const filePath = path.join(process.cwd(), 'e2e/lab-02/fixtures/test-image.png');
+    const filePath = path.join(__dirname, '../fixtures/test-image.png');
     const activeCount = await page.locator('.zg-badge-status-open').count();
     if (activeCount === 0) {
       await page.setInputFiles('input[type="file"]', filePath);

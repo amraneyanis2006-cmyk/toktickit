@@ -208,7 +208,7 @@ Lab 2 follows the same Git Flow-style model as Lab 1, scoped to its own staging 
 - `lab2-staging` — Lab 2 integration branch
 - `feature/N-name` — one feature branch per GitHub Issue, merged into `lab2-staging` via peer-reviewed Pull Requests
 
-See [`docs/lab-02/reviewer.md`](docs/lab-02/reviewer.md) for peer review records and [`docs/lab-02/ai_use.md`](docs/lab-02/ai_use.md) for the AI usage log.
+See [`docs/lab-02/reviewer.md`](docs/lab-02/reviewer.md) for peer review records and [`docs/lab-02/ai_use.md`](docs/lab-02/ai-use.md) for the AI usage log.
 
 ## License
 

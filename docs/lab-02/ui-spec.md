@@ -162,7 +162,7 @@ States:
 - Page header: "My Tickets" `h1` + subtitle, "Clear Filters" (tertiary) and "+ Create
   Ticket" (primary) top-right.
 - Toolbar row: search input (icon-prefixed, placeholder "Search by ticket number or
-  summary…"), Category / Requested Priority / IT Priority / Current Status filter
+  summary…"), Category / Requested Priority / Current Status filter
   selects.
 - **Desktop table** columns: Ticket No. (sortable), Created Date (sortable), Summary,
   Category, Requested Priority (badge), Current Status (badge), Last Updated

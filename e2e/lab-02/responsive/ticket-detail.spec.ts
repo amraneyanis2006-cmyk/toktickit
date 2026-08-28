@@ -1,6 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { selectRequester } from '../../helpers';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const filePath = path.join(__dirname, '../fixtures/test-image.png');
 
 test.describe('RESP-03: Ticket Detail responsive at 375px', () => {
   test('attachment rows stay usable, action buttons are tappable (>=44px)', async ({ page }) => {
@@ -14,7 +18,7 @@ test.describe('RESP-03: Ticket Detail responsive at 375px', () => {
 
     const activeCount = await page.locator('.zg-badge-status-open').count();
     if (activeCount === 0) {
-      const filePath = path.join(process.cwd(), 'e2e/lab-02/fixtures/test-image.png');
+      const filePath = path.join(__dirname, '../fixtures/test-image.png');
       await page.setInputFiles('input[type="file"]', filePath);
       await page.waitForSelector('.zg-badge-status-open');
     }

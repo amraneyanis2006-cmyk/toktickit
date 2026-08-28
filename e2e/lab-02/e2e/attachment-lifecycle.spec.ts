@@ -1,6 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { selectRequester } from '../../helpers';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const filePath = path.join(__dirname, '../fixtures/test-image.png');
 
 test.describe('E2E-03: Attachment lifecycle (add, download, remove)', () => {
   test('a fresh ticket goes through add -> download -> remove', async ({ page }) => {
@@ -28,7 +32,7 @@ test.describe('E2E-03: Attachment lifecycle (add, download, remove)', () => {
     await expect(page.getByText('Attachments (0)')).toBeVisible();
 
     // 1. Add: upload a file.
-    const filePath = path.join(process.cwd(), 'e2e/lab-02/fixtures/test-image.png');
+    const filePath = path.join(__dirname, '../fixtures/test-image.png');
     await page.setInputFiles('input[type="file"]', filePath);
     await page.waitForSelector('.zg-badge-status-open');
     await expect(page.getByText('Attachments (1)')).toBeVisible();

@@ -84,7 +84,7 @@ re-inventing styling per screen.
 | BR-09 | Ticket search matches Ticket Number or Summary, case-insensitively, using partial (substring) matching. |
 | BR-10 | Ticket filtering supports Category, Requested Priority, and Current Status, independently combinable. |
 | BR-11 | The default Ticket sort is Created Date descending (newest first); a secondary deterministic tiebreaker (Ticket Number descending) is applied for equal timestamps. |
-| BR-12 | Ticket list pagination defaults to page 1, page size 10; `pageSize` may be any integer from 1 to 100. Invalid, non-integer, or out-of-range `page`/`pageSize` values fall back to the defaults (page 1, pageSize 10) rather than erroring. 
+| BR-12 | Ticket list pagination defaults to page 1, page size 10; `pageSize` may be any integer from 1 to 100. Invalid, non-integer, or out-of-range `page`/`pageSize` values fall back to the defaults (page 1, pageSize 10) rather than erroring. | 
 | BR-13 | While a Create Ticket or Add Attachment request is in flight, the corresponding submit control is disabled to prevent duplicate submissions. |
 | BR-14 | Ticket Summary is required, trimmed of leading/trailing whitespace, and must be between 5 and 150 characters. |
 | BR-15 | Ticket Description is required, trimmed, and must be between 10 and 2000 characters. |
