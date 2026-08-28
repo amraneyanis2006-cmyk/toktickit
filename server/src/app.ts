@@ -1,31 +1,22 @@
 import express from 'express';
 import cors from 'cors';
-import { PrismaClient } from '@prisma/client';
+import healthRouter from './routes/health';
+import categoriesRouter from './routes/categories';
+import systemsRouter from './routes/relatedSystems';
+import requestersRouter from './routes/requesters';
+import ticketsRouter from './routes/tickets';
+import attachmentsRouter from './routes/attachments';
 
 const app = express();
-const prisma = new PrismaClient();
 
 app.use(cors());
 app.use(express.json());
 
-// Endpoint Health Check (Issue #2)
-app.get('/api/health', (req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    service: 'TokTickIT API'
-  });
-});
-
-// Endpoint Categories (Issue #4)
-app.get('/api/categories', async (req, res) => {
-  try {
-    const categories = await prisma.category.findMany({
-      orderBy: { id: 'asc' }
-    });
-    res.status(200).json(categories);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch categories' });
-  }
-});
+app.use('/api', healthRouter);
+app.use('/api', categoriesRouter);
+app.use('/api', systemsRouter);
+app.use('/api', requestersRouter);
+app.use('/api', ticketsRouter);
+app.use('/api', attachmentsRouter);
 
 export default app;

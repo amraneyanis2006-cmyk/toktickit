@@ -1,0 +1,182 @@
+:root {
+  --zg-primary: #006B3C;
+  --zg-secondary: #0B7A46;
+  --zg-pale: #EAF6EF;
+  --zg-bg: #F5F7F6;
+  --zg-surface: #FFFFFF;
+  --zg-text: #1F2A24;
+  --zg-text-muted: #5B6B62;
+  --zg-field-bg: #FFFFFF;
+  --zg-field-border: #CBD5D1;
+  --zg-field-readonly: #F1EFE6;
+  --zg-error: #B3261E;
+  --zg-error-bg: #FBEAE9;
+  --zg-warning: #B8860B;
+  --zg-warning-bg: #FDF3D8;
+  --zg-success-bg: #EAF6EF;
+  --zg-focus-ring: #0B7A46;
+}
+
+body {
+  background-color: var(--zg-bg);
+  color: var(--zg-text);
+}
+
+/* App shell header */
+.zg-header {
+  background-color: var(--zg-primary);
+}
+
+.zg-header .navbar-brand,
+.zg-header .nav-link {
+  color: #ffffff !important;
+}
+
+.zg-header .nav-link.active {
+  border-bottom: 2px solid var(--zg-secondary);
+  font-weight: 600;
+}
+
+/* Cards / surfaces */
+.zg-card {
+  background-color: var(--zg-surface);
+  border: 1px solid #E2E8E5;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+/* Buttons */
+.btn-zg-primary {
+  background-color: var(--zg-primary);
+  border-color: var(--zg-primary);
+  color: #ffffff;
+}
+.btn-zg-primary:hover,
+.btn-zg-primary:focus {
+  background-color: var(--zg-secondary);
+  border-color: var(--zg-secondary);
+  color: #ffffff;
+}
+.btn-zg-primary:disabled {
+  opacity: 0.5;
+}
+
+.btn-zg-secondary {
+  background-color: #ffffff;
+  border: 1px solid var(--zg-primary);
+  color: var(--zg-primary);
+}
+
+.btn-zg-tertiary {
+  background: none;
+  border: none;
+  color: var(--zg-secondary);
+  text-decoration: none;
+}
+.btn-zg-tertiary:hover {
+  text-decoration: underline;
+}
+
+/* Form fields */
+.zg-readonly-field {
+  background-color: var(--zg-field-readonly);
+  border: 1px solid var(--zg-field-border);
+  border-radius: 4px;
+  padding: 0.375rem 0.75rem;
+  color: var(--zg-text);
+}
+
+.zg-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--zg-text-muted);
+  margin-bottom: 0.25rem;
+  display: block;
+}
+
+.zg-required-asterisk {
+  color: var(--zg-error);
+  margin-left: 2px;
+}
+
+.zg-field-error {
+  color: var(--zg-error);
+  font-size: 0.8125rem;
+  margin-top: 0.25rem;
+}
+
+.form-control.is-invalid,
+.form-select.is-invalid {
+  border-color: var(--zg-error);
+}
+
+/* Callouts */
+.zg-callout-info {
+  background-color: var(--zg-pale);
+  border: 1px solid var(--zg-secondary);
+  color: var(--zg-text);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+}
+
+.zg-callout-neutral {
+  background-color: #F1F3F2;
+  border: 1px solid #D8DEDB;
+  color: var(--zg-text-muted);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+}
+
+.zg-callout-error {
+  background-color: var(--zg-error-bg);
+  border: 1px solid var(--zg-error);
+  color: var(--zg-error);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+}
+
+/* Focus visibility */
+.form-control:focus,
+.form-select:focus,
+.btn:focus-visible {
+  box-shadow: 0 0 0 2px rgba(11, 122, 70, 0.25);
+  border-color: var(--zg-focus-ring);
+}
+
+/* Priority / Status badges (ui-spec.md §5) */
+.zg-badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.zg-badge-priority-low,
+.zg-badge-status-new,
+.zg-badge-status-resolved {
+  background-color: var(--zg-pale);
+  color: var(--zg-secondary);
+}
+.zg-badge-priority-medium,
+.zg-badge-status-in_progress {
+  background-color: #FDF3D8;
+  color: var(--zg-warning);
+}
+.zg-badge-priority-high {
+  background-color: var(--zg-error-bg);
+  color: var(--zg-error);
+}
+.zg-badge-status-open {
+  background-color: #E7F0FA;
+  color: #1F5F9C;
+}
+
+/* Ensure tap targets meet the 44px WCAG guideline on mobile (<768px) */
+@media (max-width: 767.98px) {
+  .zg-card .btn.btn-sm {
+    min-height: 44px;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+}

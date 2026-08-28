@@ -1,4 +1,6 @@
-# AI Usage Log (`ai_use.md`)
+# AI Usage Log (`ai-use.md`)
+
+**LLM used:** Claude (via Claude Code) — Anthropic
 
 | Prompt # / Stage | Objective / Key Prompt | AI Output & Assistance | Human Oversight & Reflection |
 | :--- | :--- | :--- | :--- |
