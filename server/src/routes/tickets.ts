@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { requireActiveRequester } from '../middleware/requesterContext';
 import { generateTicketNumber } from '../utils/ticketNumber';
+import { validateTicketFields, normalizePagination } from '../utils/validation';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -21,21 +22,12 @@ router.post('/tickets', requireActiveRequester, async (req: Request, res: Respon
 
     const requesterId = req.requester!.id;
 
-    const errors: Record<string, string> = {};
+    // UNIT-03: Summary/Description length + trim validation, extracted to
+    // utils/validation.ts so it's testable in isolation from HTTP/DB.
+    const errors: Record<string, string> = { ...validateTicketFields({ summary, description }) };
 
     const trimmedSummary = summary?.trim();
-    if (!trimmedSummary || trimmedSummary.length < 5) {
-      errors.summary = 'Summary must be at least 5 characters.';
-    } else if (trimmedSummary.length > 150) {
-      errors.summary = 'Summary must not exceed 150 characters.';
-    }
-
     const trimmedDescription = description?.trim();
-    if (!trimmedDescription || trimmedDescription.length < 10) {
-      errors.description = 'Description must be at least 10 characters.';
-    } else if (trimmedDescription.length > 2000) {
-      errors.description = 'Description must not exceed 2000 characters.';
-    }
 
     if (!categoryId || typeof categoryId !== 'number') {
       errors.categoryId = 'Select a valid category.';
@@ -135,15 +127,11 @@ router.get('/tickets', requireActiveRequester, async (req: Request, res: Respons
   try {
     const requesterId = req.requester!.id;
 
-    // PAGINATION
-    let page = Number(req.query.page) || 1;
-    if (page < 1 || !Number.isInteger(page)) page = 1;
-
-    let pageSize = Number(req.query.pageSize) || 10;
-    if (pageSize < 1 || pageSize > 100 || !Number.isInteger(pageSize)) {
-      pageSize = 10;
-    }
-
+    // PAGINATION — UNIT-05: normalizePagination extracted to utils/validation.ts
+    const { page, pageSize } = normalizePagination({
+      page: req.query.page,
+      pageSize: req.query.pageSize,
+    });
     const skip = (page - 1) * pageSize;
 
     // TRI
@@ -153,8 +141,6 @@ router.get('/tickets', requireActiveRequester, async (req: Request, res: Respons
 
     let sortDir = req.query.sortDir as string;
     if (sortDir !== 'asc' && sortDir !== 'desc') sortDir = 'desc';
-
-    // RECHERCHE
 
     // RECHERCHE
     const search = req.query.search as string || '';
