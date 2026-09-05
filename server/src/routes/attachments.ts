@@ -5,19 +5,24 @@ import { randomUUID } from 'crypto';
 import path from 'path';
 import fs from 'fs/promises';
 import { requireActiveRequester } from '../middleware/requesterContext';
+import { validateAttachment, MAX_ATTACHMENT_SIZE } from '../utils/validation';
 
 const router = Router();
 const prisma = new PrismaClient();
 
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_FILE_SIZE },
+  limits: { fileSize: MAX_ATTACHMENT_SIZE },
   fileFilter: (req, file, cb) => {
-    if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+    // UNIT-04: MIME check delegated to validateAttachment (utils/validation.ts)
+    // so the business rule (BR-20) is testable in isolation. Size isn't known
+    // yet at fileFilter time (multer streams the body), so size:0 here means
+    // only the MIME branch of validateAttachment can fire — actual file size
+    // is still enforced by multer's own `limits.fileSize` above (LIMIT_FILE_SIZE).
+    const result = validateAttachment({ mimetype: file.mimetype, size: 0 });
+    if (result.error === 'UNSUPPORTED_FILE_TYPE') {
       return cb(new Error('UNSUPPORTED_FILE_TYPE'));
     }
     cb(null, true);

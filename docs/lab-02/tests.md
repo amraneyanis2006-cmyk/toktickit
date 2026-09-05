@@ -19,12 +19,11 @@ pass. Six levels are covered:
 No planned test may be skipped, disabled, or `.only`-marked in the final `main` branch
 (Definition of Done, `specification.md` §10).
 
-**Note on scope actually delivered (see §7):** 14 of the 53 originally planned test IDs
-(the 5 dedicated Unit-level tests, 3 API edge cases, and 6 My-Tickets/Ticket-Detail/
-Attachment-Section component tests) were not implemented as separate automated tests in
-the final `main` branch. Every Acceptance Criterion in §3 remains covered by at least one
-test that *was* implemented and passes, so no AC is left untested — see §7 for the
-itemised list and rationale.
+**Note on scope actually delivered (see §7):** 9 of the 53 originally planned test IDs
+(3 API edge cases and 6 My-Tickets/Ticket-Detail/Attachment-Section component tests)
+were not implemented as separate automated tests in the final `main` branch. Every
+Acceptance Criterion in §3 remains covered by at least one test that *was* implemented
+and passes, so no AC is left untested — see §7 for the itemised list and rationale.
 
 ## 2. Planned Tests
 
@@ -32,11 +31,11 @@ itemised list and rationale.
 
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
 |---|---|---|---|---|---|---|
-| UNIT-01 | Unit | BR-01 | Ticket Number generator format | Returns `TKT-{YYYY}-{6 digits}`, zero-padded | `server/tests/lab-02/ticket-number.unit.test.ts` | Deferred |
-| UNIT-02 | Unit | BR-01 | Ticket Number uniqueness under sequential calls | Two consecutive generations never collide | `server/tests/lab-02/ticket-number.unit.test.ts` | Deferred |
-| UNIT-03 | Unit | BR-14/BR-15 | Summary/Description trim + length validator | Rejects <5 / >150 chars (summary), <10 / >2000 chars (description); trims whitespace before checking | `server/tests/lab-02/ticket-validation.unit.test.ts` | Deferred |
-| UNIT-04 | Unit | BR-20 | Attachment MIME/size validator | Accepts JPG/JPEG/PNG/WEBP/PDF ≤5MB; rejects all else | `server/tests/lab-02/attachment-validation.unit.test.ts` | Deferred |
-| UNIT-05 | Unit | BR-12 | Pagination parameter normalizer | Invalid `page`/`pageSize` fall back to `1`/`10`; valid `pageSize` of 20/50 pass through | `server/tests/lab-02/pagination.unit.test.ts` | Deferred |
+| UNIT-01 | Unit | BR-01 | Ticket Number generator format | Returns `TKT-{YYYY}-{6 digits}`, zero-padded | `server/tests/lab-02/ticket-number.unit.test.ts` | Pass |
+| UNIT-02 | Unit | BR-01 | Ticket Number uniqueness under sequential calls | Two consecutive generations never collide | `server/tests/lab-02/ticket-number.unit.test.ts` | Pass |
+| UNIT-03 | Unit | BR-14/BR-15 | Summary/Description trim + length validator | Rejects <5 / >150 chars (summary), <10 / >2000 chars (description); trims whitespace before checking | `server/tests/lab-02/ticket-validation.unit.test.ts` | Pass |
+| UNIT-04 | Unit | BR-20 | Attachment MIME/size validator | Accepts JPG/JPEG/PNG/WEBP/PDF ≤5MB; rejects all else | `server/tests/lab-02/attachment-validation.unit.test.ts` | Pass |
+| UNIT-05 | Unit | BR-12 | Pagination parameter normalizer | Invalid `page`/`pageSize` fall back to `1`/`10`; valid `pageSize` of 20/50 pass through | `server/tests/lab-02/pagination.unit.test.ts` | Pass |
 
 ### 2.2 API / Integration Tests
 
@@ -161,10 +160,8 @@ All three test commands were run against `main` on 2026-09-01/02.
 
 **`cd server && npx vitest run`**
 ```
-Test Files  9 passed (9)
-     Tests  40 passed (40)
-  Start at  16:10:23
-  Duration  2.39s
+Test Files  13 passed (13)
+     Tests  62 passed (62)
 ```
 
 **`cd client && npx vitest run`**
@@ -181,8 +178,8 @@ Running 37 tests using 4 workers
   37 passed (43.7s)
 ```
 
-**Total: 86 automated tests passing, 0 failing, 0 skipped/`.only`**, across 39 of the 53
-originally planned test IDs. The remaining 14 planned IDs were not implemented as
+**Total: 108 automated tests passing, 0 failing, 0 skipped/`.only`**, across 44 of the 53
+originally planned test IDs. The remaining 9 planned IDs were not implemented as
 separate automated tests — see §7 for the full list and why every AC is still covered.
 
 Individual test names were confirmed against the plan via a one-off
@@ -199,12 +196,6 @@ maps each `✓ API-xx: ...` / `✓ UI-xx: ...` output line back to the Test ID c
 - Visual regression (VIS-01/VIS-02) is checklist + screenshot-archive based rather than
   pixel-diffed against a golden image, consistent with the labsheet's "visual
   inspection" wording in §8.8 rather than a strict CI visual-regression gate.
-- **UNIT-01 to UNIT-05 (5 tests) were not implemented as separate `*.unit.test.ts`
-  files.** The behaviors they targeted (Ticket Number format/uniqueness, field-length
-  validation, attachment MIME/size validation, pagination normalization) are exercised
-  indirectly through the corresponding API tests (API-01, API-15/16, API-11/12) that
-  drive the same code paths through the HTTP layer, but no isolated unit-level test
-  exists for the underlying pure functions. Deferred to a follow-up cleanup pass.
 - **API-03, API-04, API-09 (3 tests) were not implemented.** `create-ticket.api.test.ts`
   and `my-tickets.api.test.ts` do not currently include a case for an under-length
   Description, a non-existent `categoryId`/`relatedSystemId`, or combined AND-semantics
