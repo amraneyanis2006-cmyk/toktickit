@@ -1,4 +1,5 @@
-import { Router, Request, Response } from 'express';
+import { Router } from 'express';
+import type { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { requireActiveRequester } from '../middleware/requesterContext';
 import { generateTicketNumber } from '../utils/ticketNumber';
@@ -227,7 +228,7 @@ router.get('/tickets/:ticketNumber', requireActiveRequester, async (req: Request
     const { ticketNumber } = req.params;
 
     const ticket = await prisma.ticket.findFirst({
-      where: { ticketNumber, requesterId }, // BR-27: ownership check inside the query itself
+      where: { ticketNumber: ticketNumber as string, requesterId }, // BR-27: ownership check inside the query itself
       include: {
         category: { select: { id: true, name: true } },
         relatedSystem: { select: { id: true, name: true } },
