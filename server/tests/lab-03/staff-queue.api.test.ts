@@ -111,6 +111,18 @@ beforeAll(async () => {
         itPriority: 'MEDIUM',
         currentStatus: 'OPEN',
       },
+      {
+        ticketNumber: 'TKT-SQ17-000004',
+        requesterId,
+        ticketOwnerId: null,
+        categoryId,
+        relatedSystemId,
+        summary: 'SQ17 requested HIGH but itPriority LOW',
+        description: 'Proves the priority filter reads itPriority, not requestedPriority.',
+        requestedPriority: 'HIGH',
+        itPriority: 'LOW',
+        currentStatus: 'NEW',
+      },
     ],
   });
 });
@@ -167,11 +179,12 @@ describe('GET /api/staff/tickets (API-19, BR-18)', () => {
       .set('Cookie', cookie);
 
     expect(res.status).toBe(200);
-    // TKT-SQ17-000001 has requestedPriority HIGH and itPriority HIGH - matches.
-    // A ticket with requestedPriority HIGH but a different itPriority would NOT match.
-    expect(res.body.data.map((t: { ticketNumber: string }) => t.ticketNumber)).toEqual([
-      'TKT-SQ17-000001',
-    ]);
+    const numbers = res.body.data.map((t: { ticketNumber: string }) => t.ticketNumber);
+    // TKT-SQ17-000001 has itPriority HIGH - matches.
+    expect(numbers).toContain('TKT-SQ17-000001');
+    // TKT-SQ17-000004 has requestedPriority HIGH but itPriority LOW - must NOT match,
+    // otherwise this test would pass even if the filter read the wrong field.
+    expect(numbers).not.toContain('TKT-SQ17-000004');
   });
 
   it('ownership=mine returns only the acting staff member\'s tickets', async () => {
@@ -195,9 +208,10 @@ describe('GET /api/staff/tickets (API-19, BR-18)', () => {
       .set('Cookie', cookie);
 
     expect(res.status).toBe(200);
-    expect(res.body.data.map((t: { ticketNumber: string }) => t.ticketNumber)).toEqual([
-      'TKT-SQ17-000002',
-    ]);
+    expect(res.body.data.map((t: { ticketNumber: string }) => t.ticketNumber)).toEqual(
+      expect.arrayContaining(['TKT-SQ17-000002', 'TKT-SQ17-000004'])
+    );
+    expect(res.body.data.length).toBe(2);
   });
 
   it('search matches ticket number or summary, case-insensitive', async () => {
@@ -224,7 +238,7 @@ describe('GET /api/staff/tickets (API-19, BR-18)', () => {
     expect(res.body.pagination).toEqual({
       page: 1,
       pageSize: 2,
-      totalItems: 3,
+      totalItems: 4,
       totalPages: 2,
     });
     expect(res.body.data.length).toBe(2);
