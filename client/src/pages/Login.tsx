@@ -15,7 +15,7 @@ export default function Login() {
   const [error, setError] = useState('');
 
   if (status === 'ready' && user) {
-    return <Navigate to="/tickets" replace />;
+    return <Navigate to="/" replace />;
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -24,7 +24,7 @@ export default function Login() {
     setSubmitting(true);
     try {
       await login(email, password);
-      navigate('/tickets');
+      navigate('/');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Invalid email or password.');
     } finally {
