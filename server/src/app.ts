@@ -5,7 +5,6 @@ import healthRouter from './routes/health';
 import authRouter from './routes/auth';
 import categoriesRouter from './routes/categories';
 import systemsRouter from './routes/relatedSystems';
-import requestersRouter from './routes/requesters';
 import ticketsRouter from './routes/tickets';
 import attachmentsRouter from './routes/attachments';
 
@@ -41,7 +40,6 @@ app.use('/api', healthRouter);
 app.use('/api', authRouter);
 app.use('/api', categoriesRouter);
 app.use('/api', systemsRouter);
-app.use('/api', requestersRouter);
 app.use('/api', ticketsRouter);
 app.use('/api', attachmentsRouter);
 

@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { apiFetch, ApiError } from '../api/apiClient';
-import { useRequester } from '../context/RequesterContext';
+import { apiFetch } from '../api/apiClient';
 
 interface RefItem {
   id: number;
@@ -41,7 +40,6 @@ function StatusBadge({ value }: { value: string }) {
 }
 
 export default function MyTickets() {
-  const { requester } = useRequester();
   const navigate = useNavigate();
   const [categories, setCategories] = useState<RefItem[]>([]);
 
@@ -73,9 +71,7 @@ export default function MyTickets() {
       params.set('page', String(page));
       params.set('pageSize', String(pageSize));
 
-      const res = await apiFetch<TicketsResponse>(`/tickets?${params.toString()}`, {
-        requesterId: requester?.id,
-      });
+      const res = await apiFetch<TicketsResponse>(`/tickets?${params.toString()}`);
       setResult(res);
       setFetchState('success');
 
@@ -91,7 +87,7 @@ export default function MyTickets() {
       setFetchState('error');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requester?.id, search, category, priority, status, sortBy, sortDir, page, pageSize]);
+  }, [search, category, priority, status, sortBy, sortDir, page, pageSize]);
 
   useEffect(() => {
     apiFetch<RefItem[]>('/categories').then(setCategories).catch(() => {});

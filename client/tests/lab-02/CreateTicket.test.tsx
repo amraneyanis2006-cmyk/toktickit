@@ -2,7 +2,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import CreateTicket from '../../src/pages/CreateTicket';
-import { RequesterProvider } from '../../src/context/RequesterContext';
+
+vi.mock('../../src/context/AuthContext', () => ({
+  useAuth: () => ({
+    user: { id: 1, name: 'Jennifer Anderson', email: 'jennifer.anderson@toktickit.test', role: 'REQUESTER', mustChangePassword: false },
+    status: 'ready',
+    login: vi.fn(),
+    logout: vi.fn(),
+    refresh: vi.fn(),
+  }),
+}));
 
 const categories = [{ id: 1, name: 'Hardware' }];
 const relatedSystems = [{ id: 1, name: 'Corporate Laptop' }];
@@ -21,15 +30,7 @@ function jsonResponse(body: any, status = 200) {
 }
 
 function renderScreen() {
-  sessionStorage.setItem(
-    'toktickit.devRequester',
-    JSON.stringify({ id: 1, name: 'Jennifer Anderson', email: 'jennifer@toktickit.test' })
-  );
-  return render(
-    <RequesterProvider>
-      <CreateTicket />
-    </RequesterProvider>
-  );
+  return render(<CreateTicket />);
 }
 
 describe('CreateTicket', () => {
