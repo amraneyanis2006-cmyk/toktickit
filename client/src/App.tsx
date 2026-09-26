@@ -1,20 +1,23 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { RequesterProvider } from './context/RequesterContext';
-import RequireRequester from './components/RequireRequester';
+import { AuthProvider } from './context/AuthContext';
+import RequireAuth from './components/RequireAuth';
 import AppShell from './components/AppShell';
-import RequesterSelection from './pages/RequesterSelection';
+import Login from './pages/Login';
+import ChangePassword from './pages/ChangePassword';
 import MyTickets from './pages/MyTickets';
 import CreateTicket from './pages/CreateTicket';
 import TicketDetail from './pages/TicketDetail';
 
 export default function App() {
   return (
-    <RequesterProvider>
+    <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/select-requester" element={<RequesterSelection />} />
+          <Route path="/login" element={<Login />} />
 
-          <Route element={<RequireRequester />}>
+          <Route element={<RequireAuth />}>
+            <Route path="/change-password" element={<ChangePassword />} />
+
             <Route element={<AppShell />}>
               <Route path="/tickets" element={<MyTickets />} />
               <Route path="/tickets/new" element={<CreateTicket />} />
@@ -25,6 +28,6 @@ export default function App() {
           <Route path="*" element={<Navigate to="/tickets" replace />} />
         </Routes>
       </BrowserRouter>
-    </RequesterProvider>
+    </AuthProvider>
   );
 }

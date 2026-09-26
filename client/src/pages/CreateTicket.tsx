@@ -1,6 +1,7 @@
-import { useEffect, useState, FormEvent } from 'react';
+import { useEffect, useState } from 'react';
+import type { FormEvent } from 'react';
 import { apiFetch, ApiError } from '../api/apiClient';
-import { useRequester } from '../context/RequesterContext';
+import { useAuth } from '../context/AuthContext';
 
 interface RefItem {
   id: number;
@@ -25,7 +26,7 @@ interface PendingFile {
 type SubmitState = 'idle' | 'submitting' | 'success' | 'error';
 
 export default function CreateTicket() {
-  const { requester } = useRequester();
+  const { user } = useAuth();
 
   const [categories, setCategories] = useState<RefItem[]>([]);
   const [relatedSystems, setRelatedSystems] = useState<RefItem[]>([]);
@@ -134,7 +135,6 @@ export default function CreateTicket() {
     try {
       const ticket = await apiFetch<TicketResponse>('/tickets', {
         method: 'POST',
-        requesterId: requester?.id,
         body: JSON.stringify({
           categoryId: Number(categoryId),
           relatedSystemId: Number(relatedSystemId),
@@ -218,7 +218,7 @@ export default function CreateTicket() {
 
         <div className="mb-4">
           <label className="zg-label">Requester</label>
-          <div className="zg-readonly-field">{requester?.name}</div>
+          <div className="zg-readonly-field">{user?.name}</div>
         </div>
 
         {/* Classification row */}

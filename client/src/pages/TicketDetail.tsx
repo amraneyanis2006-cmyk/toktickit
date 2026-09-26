@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { apiFetch, ApiError } from '../api/apiClient';
-import { useRequester } from '../context/RequesterContext';
 
 interface Attachment {
   id: number;
@@ -10,6 +9,16 @@ interface Attachment {
   sizeBytes: number;
   uploadedAt: string;
   isRemoved: boolean;
+}
+
+interface Comment {
+  id: number;
+  ticketId: number;
+  authorId: number;
+  authorName: string;
+  authorRole: 'REQUESTER' | 'IT_STAFF' | 'ADMINISTRATOR';
+  content: string;
+  createdAt: string;
 }
 
 interface TicketDetailResponse {
@@ -21,10 +30,12 @@ interface TicketDetailResponse {
   description: string;
   requestedPriority: 'LOW' | 'MEDIUM' | 'HIGH';
   itPriority: string | null;
-  currentStatus: 'NEW' | 'OPEN' | 'IN_PROGRESS' | 'RESOLVED';
+  currentStatus: 'NEW' | 'OPEN' | 'IN_PROGRESS' | 'WAITING_FOR_REQUESTER' | 'RESOLVED' | 'CLOSED' | 'REOPENED' | 'CANCELLED';
+  requesterIndicatedResolved: boolean;
   createdAt: string;
   updatedAt: string;
   attachments: Attachment[];
+  publicComments: Comment[];
 }
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
@@ -60,7 +71,6 @@ function formatSize(bytes: number) {
 
 export default function TicketDetail() {
   const { ticketNumber } = useParams<{ ticketNumber: string }>();
-  const { requester } = useRequester();
 
   const [ticket, setTicket] = useState<TicketDetailResponse | null>(null);
   const [fetchState, setFetchState] = useState<FetchState>('loading');
@@ -70,12 +80,16 @@ export default function TicketDetail() {
 
   const [removingId, setRemovingId] = useState<number | null>(null);
   const [removeError, setRemoveError] = useState('');
+
+  const [commentText, setCommentText] = useState('');
+  const [postingComment, setPostingComment] = useState(false);
+  const [commentError, setCommentError] = useState('');
+
+  const [markingResolved, setMarkingResolved] = useState(false);
   const loadTicket = async () => {
     setFetchState('loading');
     try {
-      const data = await apiFetch<TicketDetailResponse>(`/tickets/${ticketNumber}`, {
-        requesterId: requester?.id,
-      });
+      const data = await apiFetch<TicketDetailResponse>(`/tickets/${ticketNumber}`);
       setTicket(data);
       setFetchState('success');
     } catch (err) {
@@ -93,6 +107,47 @@ export default function TicketDetail() {
   }, [ticketNumber]);
 
   const activeAttachmentCount = ticket?.attachments.filter((a) => !a.isRemoved).length ?? 0;
+
+  const handlePostComment = async () => {
+    const trimmed = commentText.trim();
+    if (!trimmed) return;
+
+    setCommentError('');
+    setPostingComment(true);
+    try {
+      await apiFetch(`/tickets/${ticketNumber}/comments`, {
+        method: 'POST',
+        body: JSON.stringify({ content: trimmed }),
+      });
+      setCommentText('');
+      await loadTicket();
+    } catch (err) {
+      setCommentError(err instanceof ApiError ? err.message : 'Unable to post comment.');
+    } finally {
+      setPostingComment(false);
+    }
+  };
+
+  const handleMarkResolved = async () => {
+    setMarkingResolved(true);
+    try {
+      await apiFetch(`/tickets/${ticketNumber}/resolved-indication`, { method: 'PATCH' });
+      await loadTicket();
+    } catch {
+      // Safe failure: state simply doesn't update; the button remains actionable.
+    } finally {
+      setMarkingResolved(false);
+    }
+  };
+
+  const formatCommentDate = (iso: string) =>
+    new Date(iso).toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -117,7 +172,6 @@ export default function TicketDetail() {
         formData.append('file', file);
         await apiFetch(`/tickets/${ticketNumber}/attachments`, {
           method: 'POST',
-          requesterId: requester?.id,
           body: formData,
         });
       } catch (err) {
@@ -134,7 +188,7 @@ export default function TicketDetail() {
   const handleDownload = async (attachmentId: number, filename: string) => {
     try {
       const res = await fetch(`http://localhost:3000/api/attachments/${attachmentId}/download`, {
-        headers: requester?.id ? { 'x-requester-id': String(requester.id) } : {},
+        credentials: 'include',
       });
       if (!res.ok) throw new Error('Download failed');
       const blob = await res.blob();
@@ -163,7 +217,6 @@ export default function TicketDetail() {
     try {
       await apiFetch(`/attachments/${attachmentId}/remove`, {
         method: 'PATCH',
-        requesterId: requester?.id,
         body: JSON.stringify({ reason: reason.trim() }),
       });
       await loadTicket();
@@ -238,7 +291,23 @@ export default function TicketDetail() {
         </div>
         <div className="col-md-4 mb-3">
           <label className="zg-label">Current Status</label>
-          <div><StatusBadge value={ticket.currentStatus} /></div>
+          <div className="d-flex align-items-center gap-2 flex-wrap">
+            <StatusBadge value={ticket.currentStatus} />
+            {ticket.requesterIndicatedResolved ? (
+              <button type="button" className="btn btn-sm btn-zg-secondary" disabled>
+                You indicated this is resolved
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-sm btn-zg-tertiary"
+                onClick={handleMarkResolved}
+                disabled={markingResolved}
+              >
+                {markingResolved ? 'Saving...' : 'Problem Appears Resolved'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -252,6 +321,58 @@ export default function TicketDetail() {
         <div className="zg-readonly-field" style={{ whiteSpace: 'pre-wrap' }}>
           {ticket.description}
         </div>
+      </div>
+
+      <hr className="my-4" />
+
+      {/* Public Comments */}
+      <div className="mb-2">
+        <h2 className="h6 mb-3">Public Comments ({ticket.publicComments.length})</h2>
+      </div>
+
+      {ticket.publicComments.length === 0 ? (
+        <p className="text-muted small mb-3">No comments yet.</p>
+      ) : (
+        <div className="d-flex flex-column gap-2 mb-3">
+          {ticket.publicComments.map((c) => (
+            <div key={c.id} className="zg-callout-info p-3">
+              <div className="d-flex justify-content-between align-items-center mb-1">
+                <span className="fw-semibold">
+                  {c.authorName}{' '}
+                  <span className="badge bg-secondary ms-1">{c.authorRole.replace('_', ' ')}</span>
+                </span>
+                <span className="text-muted small">{formatCommentDate(c.createdAt)}</span>
+              </div>
+              <div style={{ whiteSpace: 'pre-wrap' }}>{c.content}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mb-4">
+        <label htmlFor="new-comment" className="visually-hidden">
+          Add a comment
+        </label>
+        <div className="input-group">
+          <input
+            id="new-comment"
+            type="text"
+            className="form-control"
+            placeholder="Type your comment here..."
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+            disabled={postingComment}
+          />
+          <button
+            type="button"
+            className="btn btn-zg-primary"
+            onClick={handlePostComment}
+            disabled={postingComment || !commentText.trim()}
+          >
+            {postingComment ? 'Posting...' : 'Post Comment'}
+          </button>
+        </div>
+        {commentError && <div className="zg-field-error mt-1">{commentError}</div>}
       </div>
 
       <hr className="my-4" />

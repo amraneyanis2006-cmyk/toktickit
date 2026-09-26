@@ -89,3 +89,21 @@ export function requirePasswordChanged(req: Request, res: Response, next: NextFu
   }
   return next();
 }
+
+/**
+ * Restricts an endpoint to one or more roles (api-spec.md section 0 role
+ * markers: Requester-only, or IT Staff/Administrator). Must run AFTER
+ * requireAuth. A mismatched role is a 403 FORBIDDEN, distinct from
+ * NOT_AUTHENTICATED (missing session) and PASSWORD_CHANGE_REQUIRED.
+ */
+export function requireRole(...roles: Role[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message: 'You do not have access to this resource.',
+      });
+    }
+    return next();
+  };
+}
