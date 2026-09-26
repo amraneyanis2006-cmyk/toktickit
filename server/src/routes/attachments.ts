@@ -1,4 +1,5 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
 import multer from 'multer';
 import { randomUUID } from 'crypto';
@@ -72,7 +73,7 @@ router.post(
       }
 
       const ticket = await prisma.ticket.findFirst({
-        where: { ticketNumber, requesterId }, // BR-27: ownership check inside the query itself
+        where: { ticketNumber: ticketNumber as string, requesterId }, // BR-27: ownership check inside the query itself
       });
 
       if (!ticket) {
