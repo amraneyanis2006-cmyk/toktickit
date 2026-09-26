@@ -26,16 +26,27 @@ export default function AppShell() {
 
           <div className="collapse navbar-collapse" id="zgNavContent">
             <ul className="navbar-nav me-auto">
-              <li className="nav-item">
-                <NavLink to="/tickets" className="nav-link">
-                  📄 My Tickets
-                </NavLink>
-              </li>
-              <li className="nav-item">
-                <NavLink to="/tickets/new" className="nav-link">
-                  ➕ Create Ticket
-                </NavLink>
-              </li>
+              {user?.role === 'REQUESTER' && (
+                <>
+                  <li className="nav-item">
+                    <NavLink to="/tickets" className="nav-link">
+                      📄 My Tickets
+                    </NavLink>
+                  </li>
+                  <li className="nav-item">
+                    <NavLink to="/tickets/new" className="nav-link">
+                      ➕ Create Ticket
+                    </NavLink>
+                  </li>
+                </>
+              )}
+              {(user?.role === 'IT_STAFF' || user?.role === 'ADMINISTRATOR') && (
+                <li className="nav-item">
+                  <NavLink to="/staff/tickets" className="nav-link">
+                    🗂️ Ticket Queue
+                  </NavLink>
+                </li>
+              )}
             </ul>
 
             {user && (
