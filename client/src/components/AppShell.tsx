@@ -47,6 +47,13 @@ export default function AppShell() {
                   </NavLink>
                 </li>
               )}
+              {user?.role === 'ADMINISTRATOR' && (
+                <li className="nav-item">
+                  <NavLink to="/admin/users" className="nav-link">
+                    👥 Users
+                  </NavLink>
+                </li>
+              )}
             </ul>
 
             {user && (

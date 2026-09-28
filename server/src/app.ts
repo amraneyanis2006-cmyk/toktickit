@@ -4,6 +4,7 @@ import session from 'express-session';
 import healthRouter from './routes/health';
 import authRouter from './routes/auth';
 import staffTicketsRouter from './routes/staffTickets';
+import adminUsersRouter from './routes/adminUsers';
 import categoriesRouter from './routes/categories';
 import systemsRouter from './routes/relatedSystems';
 import ticketsRouter from './routes/tickets';
@@ -40,6 +41,7 @@ app.use(
 app.use('/api', healthRouter);
 app.use('/api', authRouter);
 app.use('/api', staffTicketsRouter);
+app.use('/api', adminUsersRouter);
 app.use('/api', categoriesRouter);
 app.use('/api', systemsRouter);
 app.use('/api', ticketsRouter);
