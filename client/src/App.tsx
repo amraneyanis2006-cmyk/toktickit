@@ -9,6 +9,7 @@ import MyTickets from './pages/MyTickets';
 import CreateTicket from './pages/CreateTicket';
 import TicketDetail from './pages/TicketDetail';
 import StaffTicketQueue from './pages/StaffTicketQueue';
+import StaffTicketDetail from './pages/StaffTicketDetail';
 import { defaultRouteForRole } from './utils/roleRoutes';
 
 function RootRedirect() {
@@ -37,6 +38,7 @@ export default function App() {
 
               <Route element={<RequireRole allowedRoles={['IT_STAFF', 'ADMINISTRATOR']} />}>
                 <Route path="/staff/tickets" element={<StaffTicketQueue />} />
+                <Route path="/staff/tickets/:ticketNumber" element={<StaffTicketDetail />} />
               </Route>
             </Route>
           </Route>
