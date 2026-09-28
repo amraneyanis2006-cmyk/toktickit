@@ -221,8 +221,11 @@ IT Staff/Administrator user.
 
 - **Request body**
 ```json
-{ "ticketOwnerId": 3 }
+{ "ticketOwnerId": 3, "expectedUpdatedAt": "2026-08-22T09:14:00.000Z" }
 ```
+`expectedUpdatedAt` is optional: the `updatedAt` value the client last saw for this Ticket.
+When provided, it enables the optimistic-concurrency check below; when omitted, no concurrency
+check is performed (last write wins).
 (Omit `ticketOwnerId`, or set it to `null`, is invalid — claim/reassign always targets
 a specific user; to claim for yourself the client sends its own `session.userId`.)
 - **Validation — 400 `VALIDATION_ERROR`:** `ticketOwnerId` missing.
@@ -232,8 +235,8 @@ a specific user; to claim for yourself the client sends its own `session.userId`
 ```json
 { "ticketNumber": "TKT-2026-000101", "ticketOwner": { "id": 3, "name": "Alex Kim" } }
 ```
-- **Conflict — 409 `OWNERSHIP_CHANGED`:** the Ticket's `updatedAt` sent by the client
-  (optimistic-concurrency check) no longer matches the current row — another staff
+- **Conflict — 409 `OWNERSHIP_CHANGED`:** the `expectedUpdatedAt` sent by the client
+  (optimistic-concurrency check) no longer matches the Ticket's current `updatedAt` — another staff
   member changed ownership first. Client re-fetches and shows the new state.
 - **Not found — 404**: Ticket not found.
 - **Failure — 401 / 403**: see §0.
@@ -300,6 +303,25 @@ Create an Internal Note.
 - **Not found — 404**: Ticket not found.
 - **Failure — 401 / 403 `FORBIDDEN`**: a Requester calling this endpoint is rejected
   before any note content is read from the database (BR-27, AC-04).
+
+## 13a. GET /api/staff/users 🔒S
+
+Retrieve the active IT Staff and Administrator users, to populate the Claim/Reassign
+dropdown on IT Staff Ticket Detail. Added during Issue #18: `GET /api/admin/users` (§14) is
+Administrator-only, so a plain IT Staff member had no way to list possible reassignment
+targets. Deliberately minimal: `id` and `name` only, no email.
+
+- **Query parameters:** none
+- **Success — 200**
+```json
+[
+  { "id": 3, "name": "Alex Kim" },
+  { "id": 4, "name": "Priya Nandi" }
+]
+```
+Inactive users and users with role `REQUESTER` are never included (BR-11). Ordered by name.
+- **Failure — 401 / 403 `FORBIDDEN`**: see §0.
+- **Failure — 500**: `{ "error": "INTERNAL_ERROR", "message": "Unable to load users." }`
 
 ## 14. GET /api/admin/users 🔒A
 
