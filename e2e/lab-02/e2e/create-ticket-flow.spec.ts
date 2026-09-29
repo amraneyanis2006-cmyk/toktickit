@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { selectRequester } from '../../helpers';
+import { login } from '../../helpers';
+import { E2E_REQUESTER_A, FIXTURE_PASSWORD } from '../../global-setup';
 
 test.describe('E2E-01: Full responsive ticket creation flow', () => {
   test('creates a ticket end-to-end at desktop width', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
-    await selectRequester(page);
+    await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
 
     await page.getByRole('link', { name: '+ Create Ticket' }).click();
     await page.waitForURL('**/tickets/new');
@@ -34,7 +35,7 @@ test.describe('E2E-01: Full responsive ticket creation flow', () => {
 
   test('creates a ticket end-to-end at mobile width', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await selectRequester(page);
+    await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
 
     await page.getByRole('link', { name: '+ Create Ticket' }).click();
     await page.waitForURL('**/tickets/new');

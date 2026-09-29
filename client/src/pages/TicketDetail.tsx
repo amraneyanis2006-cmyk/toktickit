@@ -50,7 +50,7 @@ function PriorityBadge({ value }: { value: string }) {
 }
 
 function StatusBadge({ value }: { value: string }) {
-  return <span className={`zg-badge zg-badge-status-${value.toLowerCase()}`}>{value.replace('_', ' ')}</span>;
+  return <span className={`zg-badge zg-badge-status-${value.toLowerCase()}`}>{value.replace(/_/g, ' ')}</span>;
 }
 
 function formatDate(iso: string) {
@@ -339,7 +339,7 @@ export default function TicketDetail() {
               <div className="d-flex justify-content-between align-items-center mb-1">
                 <span className="fw-semibold">
                   {c.authorName}{' '}
-                  <span className="badge bg-secondary ms-1">{c.authorRole.replace('_', ' ')}</span>
+                  <span className="badge bg-secondary ms-1">{c.authorRole.replace(/_/g, ' ')}</span>
                 </span>
                 <span className="text-muted small">{formatCommentDate(c.createdAt)}</span>
               </div>

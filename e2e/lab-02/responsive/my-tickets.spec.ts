@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { selectRequester } from '../../helpers';
+import { login } from '../../helpers';
+import { E2E_REQUESTER_A, FIXTURE_PASSWORD } from '../../global-setup';
 
 test.describe('RESP-01: My Tickets responsive at mobile width', () => {
   test('renders as stacked cards, no horizontal scrollbar at 375px', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await selectRequester(page);
+    await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
 
     // The desktop table must be hidden, and the mobile card layout visible.
     await expect(page.locator('.table-responsive.d-none.d-md-block')).toBeHidden();

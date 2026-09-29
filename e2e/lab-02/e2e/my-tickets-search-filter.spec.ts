@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { selectRequester } from '../../helpers';
+import { login } from '../../helpers';
+import { E2E_REQUESTER_A, FIXTURE_PASSWORD } from '../../global-setup';
 
 test.describe('E2E-04: My Tickets search, filter, and pagination', () => {
   test('search narrows results, filter narrows results, pagination navigates pages', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
-    await selectRequester(page, 'Sarah Johnson');
+    await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
 
     // Unique suffix so re-running this test doesn't collide with tickets
     // left over from a previous run (no cleanup step exists yet).

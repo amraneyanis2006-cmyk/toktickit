@@ -171,6 +171,42 @@ body {
   background-color: #E7F0FA;
   color: #1F5F9C;
 }
+.zg-badge-status-waiting_for_requester {
+  background-color: #EFE7FB;
+  color: #6B4FA0;
+}
+.zg-badge-status-closed {
+  background-color: #E8ECE9;
+  color: #4C5C54;
+}
+.zg-badge-status-reopened {
+  background-color: #FCE8D6;
+  color: #9A4A0A;
+}
+.zg-badge-role-requester {
+  background-color: #EEF1EF;
+  color: #46524B;
+}
+.zg-badge-role-it_staff {
+  background-color: #E7F0FA;
+  color: #1F5F9C;
+}
+.zg-badge-role-administrator {
+  background-color: var(--zg-pale);
+  color: var(--zg-primary);
+}
+.zg-badge-active-true {
+  background-color: var(--zg-pale);
+  color: var(--zg-secondary);
+}
+.zg-badge-active-false {
+  background-color: var(--zg-error-bg);
+  color: var(--zg-error);
+}
+.zg-badge-status-cancelled {
+  background-color: #ECECEC;
+  color: #5B6B62;
+}
 
 /* Ensure tap targets meet the 44px WCAG guideline on mobile (<768px) */
 @media (max-width: 767.98px) {

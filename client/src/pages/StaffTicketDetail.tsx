@@ -399,7 +399,7 @@ export default function StaffTicketDetail() {
         {ticket.publicComments.map((c) => (
           <div key={c.id} className="zg-callout-info p-3">
             <div className="d-flex justify-content-between mb-1">
-              <span className="fw-semibold">{c.authorName} <span className="badge bg-secondary ms-1">{c.authorRole.replace('_', ' ')}</span></span>
+              <span className="fw-semibold">{c.authorName} <span className="badge bg-secondary ms-1">{c.authorRole.replace(/_/g, ' ')}</span></span>
               <span className="text-muted small">{formatDate(c.createdAt)}</span>
             </div>
             <div style={{ whiteSpace: 'pre-wrap' }}>{c.content}</div>
