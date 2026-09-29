@@ -92,7 +92,7 @@ describe('MIG-04: x-requester-id header is fully removed', () => {
 });
 
 describe('POST /api/tickets (session-scoped, API-10)', () => {
-  it('creates a ticket owned by the session user, ignoring any client-supplied requesterId', async () => {
+  it('AC-03: creates a ticket owned by the session user, ignoring any client-supplied requesterId', async () => {
     const cookie = await loginAs('rr16-requester-a@example.com', REQUESTER_A_PASSWORD);
 
     const res = await request(app)
@@ -146,6 +146,15 @@ describe('GET /api/tickets and /api/tickets/:ticketNumber (API-12 continuity)', 
 
     expect(res.status).toBe(200);
     expect(res.body.ticketNumber).toBe(ticketNumber);
+  });
+
+  it('AC-09: never includes internalNotes, even structurally - a Requester\'s own Internal Notes stay invisible', async () => {
+    const cookie = await loginAs('rr16-requester-a@example.com', REQUESTER_A_PASSWORD);
+    const res = await request(app).get(`/api/tickets/${ticketNumber}`).set('Cookie', cookie);
+
+    expect(res.status).toBe(200);
+    expect(res.body).not.toHaveProperty('internalNotes');
+    expect(Object.keys(res.body)).not.toContain('internalNotes');
   });
 
   it('returns 404 for a different Requester (BR-26/BR-27, identical to not-found)', async () => {

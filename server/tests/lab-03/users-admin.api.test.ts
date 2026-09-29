@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import { PrismaClient } from '@prisma/client';
 import app from '../../src/app';
@@ -18,7 +18,6 @@ let staffId: number;
 let requesterId: number;
 let categoryId: number;
 let relatedSystemId: number;
-let logSpy: { mock: { calls: unknown[][] } };
 
 function requireCookie(res: { headers: Record<string, unknown> }): string {
   const raw = res.headers['set-cookie'];
@@ -44,21 +43,7 @@ async function createViaApi(cookie: string, name: string, email: string, role = 
   return res.body.id;
 }
 
-/** The generated initial password is delivered on the server console only (api-spec.md sec 15/17). */
-function capturedPassword(email: string): string {
-  const prefix = `[LOCAL DEV ONLY] initial password for ${email}: `;
-  for (let i = logSpy.mock.calls.length - 1; i >= 0; i--) {
-    const first = logSpy.mock.calls[i]?.[0];
-    if (typeof first === 'string' && first.startsWith(prefix)) return first.slice(prefix.length);
-  }
-  throw new Error(`No initial password was logged for ${email}`);
-}
-
 beforeAll(async () => {
-  // Records the calls (capturedPassword reads them) but does not print: the generated
-  // initial passwords must not end up in test output or CI logs.
-  logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
   const [admin, staff, requester, category, relatedSystem] = await Promise.all([
     createFixtureUser('UA19 Admin', EMAILS.admin, 'ADMINISTRATOR'),
     createFixtureUser('UA19 Staff', EMAILS.staff, 'IT_STAFF'),
@@ -152,11 +137,11 @@ describe('POST /api/admin/users (API-31, API-32, FR-18, BR-19, BR-23)', () => {
       role: 'IT_STAFF',
       isActive: true,
       mustChangePassword: true,
+      initialPassword: expect.any(String),
     });
 
-    const plain = capturedPassword('ua19-created@example.com');
+    const plain = res.body.initialPassword as string;
     expect(plain.length).toBeGreaterThanOrEqual(12);
-    expect(JSON.stringify(res.body)).not.toContain(plain);
 
     const row = await prisma.user.findUniqueOrThrow({ where: { email: 'ua19-created@example.com' } });
     expect(row.passwordHash).toMatch(/^\$2[aby]\$/);
@@ -179,7 +164,7 @@ describe('POST /api/admin/users (API-31, API-32, FR-18, BR-19, BR-23)', () => {
 
     const login = await request(app)
       .post('/api/auth/login')
-      .send({ email: 'ua19-inactive@example.com', password: capturedPassword('ua19-inactive@example.com') });
+      .send({ email: 'ua19-inactive@example.com', password: res.body.initialPassword });
     expect(login.status).toBe(401);
   });
 
@@ -292,7 +277,7 @@ describe('PATCH /api/admin/users/:id/reset-password (API-34, AC-14, FR-20, BR-23
 
     const reset = await request(app).patch(`/api/admin/users/${target.id}/reset-password`).set('Cookie', adminCookie);
     expect(reset.status).toBe(200);
-    expect(reset.body).toEqual({ id: target.id, mustChangePassword: true });
+    expect(reset.body).toEqual({ id: target.id, mustChangePassword: true, initialPassword: expect.any(String) });
 
     const oldPasswordLogin = await request(app).post('/api/auth/login').send({ email: 'ua19-reset@example.com', password: PASSWORD });
     expect(oldPasswordLogin.status).toBe(401);
@@ -302,7 +287,7 @@ describe('PATCH /api/admin/users/:id/reset-password (API-34, AC-14, FR-20, BR-23
     expect(gated.status).toBe(403);
     expect(gated.body.error).toBe('PASSWORD_CHANGE_REQUIRED');
 
-    const newPassword = capturedPassword('ua19-reset@example.com');
+    const newPassword = reset.body.initialPassword as string;
     const login = await request(app).post('/api/auth/login').send({ email: 'ua19-reset@example.com', password: newPassword });
     expect(login.status).toBe(200);
     expect(login.body.mustChangePassword).toBe(true);

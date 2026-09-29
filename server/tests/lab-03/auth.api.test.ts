@@ -78,7 +78,7 @@ afterAll(async () => {
 });
 
 describe('POST /api/auth/login', () => {
-  it('API-01: valid login returns safe user data and sets a session cookie', async () => {
+  it('AC-01, API-01: valid login returns safe user data and sets a session cookie', async () => {
     const res = await request(app)
       .post('/api/auth/login')
       .send({ email: 'auth-test-active@example.com', password: ACTIVE_PASSWORD });
@@ -95,7 +95,7 @@ describe('POST /api/auth/login', () => {
     expect(requireCookie(res)).toMatch(/^sid=/);
   });
 
-  it('API-02: invalid password returns a generic 401', async () => {
+  it('AC-05, API-02: invalid password returns a generic 401', async () => {
     const res = await request(app)
       .post('/api/auth/login')
       .send({ email: 'auth-test-active@example.com', password: 'wrong-password' });
@@ -104,7 +104,7 @@ describe('POST /api/auth/login', () => {
     expect(res.body).toEqual({ error: 'INVALID_CREDENTIALS', message: 'Invalid email or password.' });
   });
 
-  it('API-03: login for an inactive account returns the identical 401 as API-02', async () => {
+  it('AC-05, API-03: login for an inactive account returns the identical 401 as API-02', async () => {
     const res = await request(app)
       .post('/api/auth/login')
       .send({ email: 'auth-test-inactive@example.com', password: INACTIVE_PASSWORD });
@@ -261,7 +261,7 @@ describe('POST /api/auth/change-password', () => {
 });
 
 describe('POST /api/auth/logout (API-08)', () => {
-  it('destroys the session so the old cookie is rejected afterward', async () => {
+  it('AC-06: destroys the session so the old cookie is rejected afterward', async () => {
     const login = await request(app)
       .post('/api/auth/login')
       .send({ email: 'auth-test-active@example.com', password: ACTIVE_PASSWORD });
@@ -311,5 +311,53 @@ describe('Session expiry (API-09, BR-06)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('AC-15: a real migrated Lab 2 Requester keeps exactly their pre-migration Tickets', () => {
+  it('My Tickets, authenticated as a migrated account, matches the database ground truth exactly', async () => {
+    // Uses a REAL migrated Lab 2 account (David Lee), not an e2e fixture -
+    // the closest thing to a genuine before/after migration comparison
+    // available without a database snapshot: the migration (#15) only ever
+    // touched the User table (adding passwordHash/role/mustChangePassword),
+    // never the Ticket table, so "the same Tickets as before migration" is
+    // exactly "every Ticket where requesterId = their id, today".
+    const david = await prisma.user.findUniqueOrThrow({ where: { email: 'david.lee@toktickit.test' } });
+    const groundTruthTickets = await prisma.ticket.findMany({
+      where: { requesterId: david.id },
+      select: { ticketNumber: true },
+    });
+    const groundTruthNumbers = groundTruthTickets.map((t: { ticketNumber: string }) => t.ticketNumber).sort();
+    expect(groundTruthNumbers.length).toBeGreaterThan(0); // sanity: this account must actually have history
+
+    // Reset via a real Administrator session, capturing the plaintext initial
+    // password from the HTTP response (never assume/hardcode a stale one).
+    const adminLogin = await request(app).post('/api/auth/login').send({ email: 'admin@example.com', password: 'DevPass123!' });
+    expect(adminLogin.status).toBe(200);
+    const adminCookie = requireCookie(adminLogin);
+
+    const reset = await request(app).patch(`/api/admin/users/${david.id}/reset-password`).set('Cookie', adminCookie);
+    expect(reset.status).toBe(200);
+    const newPassword = reset.body.initialPassword as string;
+
+    const davidLogin = await request(app).post('/api/auth/login').send({ email: 'david.lee@toktickit.test', password: newPassword });
+    expect(davidLogin.status).toBe(200);
+    expect(davidLogin.body.mustChangePassword).toBe(true);
+    const davidCookie = requireCookie(davidLogin);
+
+    // The reset forces mustChangePassword - complete that gate first, same as
+    // a real returning user would, before the ticket-continuity check.
+    const changeRes = await request(app)
+      .post('/api/auth/change-password')
+      .set('Cookie', davidCookie)
+      .send({ currentPassword: newPassword, newPassword: 'DavidNewChosenPass1!' });
+    expect(changeRes.status).toBe(200);
+
+    const listRes = await request(app).get('/api/tickets').query({ pageSize: 100 }).set('Cookie', davidCookie);
+    expect(listRes.status).toBe(200);
+    expect(listRes.body.pagination.totalItems).toBe(groundTruthNumbers.length);
+
+    const returnedNumbers = listRes.body.data.map((t: { ticketNumber: string }) => t.ticketNumber).sort();
+    expect(returnedNumbers).toEqual(groundTruthNumbers);
   });
 });

@@ -33,14 +33,10 @@ function toAdminUser(u: AdminUserRow) {
   };
 }
 
-/**
- * Delivery channel for a generated initial password (api-spec.md sec 15/17):
- * server console only, NEVER the HTTP response (BR-04/BR-23). Emailing it is
- * out of scope for Lab 3.
- */
-function logInitialPassword(email: string, password: string) {
-  console.log(`[LOCAL DEV ONLY] initial password for ${email}: ${password}`);
-}
+// The generated initial password is returned in the HTTP response body,
+// ONCE, and never persisted or logged anywhere (DoD sec 10: never store,
+// log, or commit a password in plaintext). Only the Administrator who made
+// this exact request ever sees it - there is no other retrieval path.
 
 function notFound(res: Response) {
   return res.status(404).json({ error: 'NOT_FOUND', message: 'User not found.' });
@@ -163,8 +159,7 @@ router.post(
         },
       });
 
-      logInitialPassword(created.email, initialPassword);
-      res.status(201).json(toAdminUser(created));
+      res.status(201).json({ ...toAdminUser(created), initialPassword });
     } catch (error) {
       if (isUniqueViolation(error)) return duplicateEmail(res);
       console.error('Error creating user:', error);
@@ -307,8 +302,7 @@ router.patch(
         data: { passwordHash: await hashPassword(initialPassword), mustChangePassword: true },
       });
 
-      logInitialPassword(target.email, initialPassword);
-      res.status(200).json({ id, mustChangePassword: true });
+      res.status(200).json({ id, mustChangePassword: true, initialPassword });
     } catch (error) {
       console.error('Error resetting password:', error);
       res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Unable to reset password.' });

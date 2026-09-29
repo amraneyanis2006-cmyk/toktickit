@@ -24,7 +24,7 @@ const ROLE_LABEL: Record<Role, string> = {
 };
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const CONSOLE_NOTE = 'It was written to the server console (local testing only).';
+
 
 // Badge classes live in zen-green.css (.zg-badge-role-*, .zg-badge-active-*),
 // consolidated there during the #20 visual QA pass per ui-spec.md sec 2.
@@ -141,11 +141,13 @@ function UserPanel({ mode, user, currentUserId, lastActiveAdmin, onClose, onSave
     setSaving(true);
     try {
       if (mode === 'create') {
-        await apiFetch('/admin/users', {
+        const created = await apiFetch<{ initialPassword: string }>('/admin/users', {
           method: 'POST',
           body: JSON.stringify({ name: name.trim(), email: email.trim(), role, isActive }),
         });
-        onSaved(`User created. Their initial password was issued. ${CONSOLE_NOTE}`);
+        onSaved(
+          `User created. Initial password (shown once, write it down now): ${created.initialPassword}`
+        );
       } else if (user) {
         const patch: Record<string, unknown> = {};
         if (name.trim() !== user.name) patch.name = name.trim();
@@ -172,8 +174,13 @@ function UserPanel({ mode, user, currentUserId, lastActiveAdmin, onClose, onSave
     setResetting(true);
     setBannerError('');
     try {
-      await apiFetch(`/admin/users/${user.id}/reset-password`, { method: 'PATCH' });
-      onSaved(`New initial password issued for ${user.name}. ${CONSOLE_NOTE} They must change it at next login.`);
+      const result = await apiFetch<{ initialPassword: string }>(
+        `/admin/users/${user.id}/reset-password`,
+        { method: 'PATCH' }
+      );
+      onSaved(
+        `New initial password for ${user.name} (shown once, write it down now): ${result.initialPassword}. They must change it at next login.`
+      );
     } catch (err) {
       setConfirmReset(false);
       reportError(err);
