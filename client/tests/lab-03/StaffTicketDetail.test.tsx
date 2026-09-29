@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import StaffTicketDetail from '../../src/pages/StaffTicketDetail';
-import { apiFetch } from '../../src/api/apiClient';
+import { apiFetch, ApiError } from '../../src/api/apiClient';
 
 vi.mock('../../src/api/apiClient', async () => {
   const actual = await vi.importActual('../../src/api/apiClient');
@@ -123,6 +123,49 @@ describe('StaffTicketDetail (UI-04)', () => {
         })
       );
     });
+  });
+
+  it('Reassign sends the SELECTED user\'s id plus expectedUpdatedAt (not just Claim)', async () => {
+    const ticket = makeTicket({ ticketOwner: { id: 191, name: 'Priya Nandi' } });
+    setupApi(ticket);
+    renderScreen();
+
+    const select = await screen.findByLabelText(/reassign to/i);
+    await userEvent.selectOptions(select, '188');
+    await userEvent.click(screen.getByRole('button', { name: /^reassign$/i }));
+
+    await waitFor(() => {
+      expect(apiFetch).toHaveBeenCalledWith(
+        '/staff/tickets/TKT-2026-000001/claim',
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ ticketOwnerId: 188, expectedUpdatedAt: ticket.updatedAt }),
+        })
+      );
+    });
+  });
+
+  it('Reassign shows a refresh message on OWNERSHIP_CHANGED and reloads the ticket', async () => {
+    const ticket = makeTicket({ ticketOwner: { id: 191, name: 'Priya Nandi' } });
+    let claimCallCount = 0;
+    (apiFetch as any).mockImplementation((path: string, opts?: { method?: string }) => {
+      if (path === '/staff/users') return Promise.resolve(staffUsers);
+      if (path.endsWith('/claim') && opts?.method === 'PATCH') {
+        claimCallCount += 1;
+        return Promise.reject(
+          new ApiError(409, 'OWNERSHIP_CHANGED', 'This ticket was changed by someone else. Refresh and try again.')
+        );
+      }
+      return Promise.resolve(ticket);
+    });
+    renderScreen();
+
+    const select = await screen.findByLabelText(/reassign to/i);
+    await userEvent.selectOptions(select, '188');
+    await userEvent.click(screen.getByRole('button', { name: /^reassign$/i }));
+
+    expect(await screen.findByText(/changed by someone else/i)).toBeInTheDocument();
+    expect(claimCallCount).toBe(1);
   });
 
   it('Status select lists ONLY the legal next statuses, not every status', async () => {

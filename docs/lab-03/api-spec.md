@@ -362,12 +362,14 @@ Create a user with a system-generated initial password.
   "email": "new.hire@example.com",
   "role": "IT_STAFF",
   "isActive": true,
-  "mustChangePassword": true
+  "mustChangePassword": true,
+  "initialPassword": "aB3!xK9pQzR2"
 }
 ```
-(The generated initial password is never returned in this response in production; for
-local course testing it is written only to server console/log, never to the HTTP
-response, per BR-04/BR-23.)
+`initialPassword` is returned ONCE, in this response only. It is never persisted in
+plaintext, never logged, and cannot be retrieved again (per DoD §10). The Administrator
+who made this request is responsible for relaying it to the new user out of band; there
+is no other delivery channel in Lab 3 (no email integration).
 - **Failure — 500**: `{ "error": "INTERNAL_ERROR", "message": "Unable to create user." }`
 
 ## 16. PATCH /api/admin/users/:id 🔒A
@@ -397,10 +399,10 @@ Issue a new system-generated initial password.
 - **Request body:** none.
 - **Success — 200**
 ```json
-{ "id": 7, "mustChangePassword": true }
+{ "id": 7, "mustChangePassword": true, "initialPassword": "kR7!mN4vXwQ1" }
 ```
-(New password delivered the same way as §15 — server-side/local-testing channel only,
-never in the JSON response.)
+`initialPassword` delivered the same way as §15: once, in this response only, never
+logged or persisted in plaintext.
 - **Not found — 404**: User not found.
 - **Failure — 401 / 403**: see §0.
 

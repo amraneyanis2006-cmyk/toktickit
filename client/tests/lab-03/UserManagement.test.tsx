@@ -117,7 +117,7 @@ describe('UserManagement (UI-05)', () => {
         })
       );
     });
-    expect(await screen.findByText(/server console/i)).toBeInTheDocument();
+    expect(await screen.findByText(/initial password.*shown once/i)).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 

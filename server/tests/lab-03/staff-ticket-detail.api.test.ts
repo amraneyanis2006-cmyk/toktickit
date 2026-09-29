@@ -73,6 +73,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await prisma.ticketInternalNote.deleteMany({ where: { authorId: { in: [staffAId, staffBId] } } });
+  await prisma.ticketComment.deleteMany({ where: { authorId: requesterId } });
   await prisma.ticket.deleteMany({ where: { ticketNumber: { startsWith: 'TKT-STO18-' } } });
   await prisma.category.delete({ where: { id: categoryId } });
   await prisma.relatedSystem.delete({ where: { id: relatedSystemId } });
@@ -100,6 +101,27 @@ describe('GET /api/staff/tickets/:ticketNumber', () => {
     const cookie = await loginAs('sto18-staff-a@example.com', STAFF_A_PASSWORD);
     const res = await request(app).get('/api/staff/tickets/TKT-NOPE-999999').set('Cookie', cookie);
     expect(res.status).toBe(404);
+  });
+
+  it('AC-10: a Requester\'s Public Comment is visible to Staff with the correct author and timestamp', async () => {
+    const requesterCookie = await loginAs('sto18-requester@example.com', REQUESTER_PASSWORD);
+    const posted = await request(app)
+      .post(`/api/tickets/${ticketNumber}/comments`)
+      .set('Cookie', requesterCookie)
+      .send({ content: 'AC-10 comment from the real ticket-owning Requester.' });
+    expect(posted.status).toBe(201);
+
+    const staffCookie = await loginAs('sto18-staff-a@example.com', STAFF_A_PASSWORD);
+    const res = await request(app).get(`/api/staff/tickets/${ticketNumber}`).set('Cookie', staffCookie);
+
+    expect(res.status).toBe(200);
+    const comment = res.body.publicComments.find(
+      (c: { content: string }) => c.content === 'AC-10 comment from the real ticket-owning Requester.'
+    );
+    expect(comment).toBeDefined();
+    expect(comment.authorRole).toBe('REQUESTER');
+    expect(comment.authorId).toBe(requesterId);
+    expect(new Date(comment.createdAt).toString()).not.toBe('Invalid Date');
   });
 });
 

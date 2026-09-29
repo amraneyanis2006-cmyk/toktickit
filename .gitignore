@@ -11,5 +11,8 @@ build/
 /playwright/.cache/
 /playwright/.auth/
 
+# Vitest
+client/test-results/
+
 # Lab 3 - local-only migrated credentials, never commit
 *.local.csv

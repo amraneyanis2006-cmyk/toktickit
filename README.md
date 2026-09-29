@@ -210,6 +210,89 @@ Lab 2 follows the same Git Flow-style model as Lab 1, scoped to its own staging 
 
 See [`docs/lab-02/reviewer.md`](docs/lab-02/reviewer.md) for peer review records and [`docs/lab-02/ai_use.md`](docs/lab-02/ai-use.md) for the AI usage log.
 
+
+---
+
+# Lab 3 — Roles, Authentication, IT Staff & Administrator Workflows
+
+Lab 3 replaces the Development Requester selector with real session-based authentication and adds three roles: **Requester** (the existing Lab 2 experience, now behind a real login), **IT Staff** (a Ticket Queue and full ticket-operations screen: claim/reassign, priority, status transitions, Public Comments, Internal Notes), and **Administrator** (User Management: create, search, edit, deactivate, reset password).
+
+Full contract documents: [`docs/lab-03/specification.md`](docs/lab-03/specification.md), [`docs/lab-03/api-spec.md`](docs/lab-03/api-spec.md), [`docs/lab-03/ui-spec.md`](docs/lab-03/ui-spec.md), [`docs/lab-03/tests.md`](docs/lab-03/tests.md).
+
+## Tech Stack (Lab 3 additions)
+
+| Layer | Technology |
+|---|---|
+| Auth | `express-session` (server-side sessions, `httpOnly` cookie), `bcrypt` password hashing |
+| Testing | Same as Lab 2, plus deterministic Playwright fixtures (`e2e/global-setup.ts`) and Vitest component "style" tests for visual/token conformance |
+
+## Setup (clean clone)
+
+The Lab 1/2 setup steps still apply. Lab 3 adds one new environment variable, `SESSION_SECRET`, required by the server (not the root Prisma CLI):
+
+```bash
+cd server
+cp .env.example .env
+```
+
+Edit `server/.env`:
+
+```
+DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/toktickit_db?schema=public"
+PORT=3000
+SESSION_SECRET="any long random string"
+```
+
+The root `.env` (used by the Prisma CLI when run from the repository root) only needs `DATABASE_URL` and `PORT` — see the root `.env.example`.
+
+From the **repository root**, install everything and set up the database in one pass:
+
+```bash
+npm install
+npm run install:all      # installs server/ and client/ dependencies too
+npm run db:migrate       # applies all migrations (Lab 1 through Lab 3)
+npm run db:seed          # seeds Categories, Related Systems, Requesters, IT Staff, Administrator, sample Tickets
+```
+
+`db:seed` is self-sufficient on a genuinely fresh database: it creates the 5 Lab 2-style Requester accounts (4 active, 1 inactive) directly if they don't already exist. The separate migration-backfill script (`npm run db:migrate-passwords`) is only relevant if you are carrying over a real pre-Lab-3 database that already has `RequesterUser` rows with no password — on a fresh clone it correctly reports "Nothing to do."
+
+Start both servers:
+
+```bash
+npm run dev               # server on :3000, client on :5173, in one command
+```
+
+Open `http://localhost:5173` and log in. Seeded credentials (**local development only**):
+
+| Role | Email | Password |
+|---|---|---|
+| Requester | `jennifer.anderson@toktickit.test` | `DevPass123!` |
+| IT Staff | `alex.kim@example.com` | `DevPass123!` |
+| Administrator | `admin@example.com` | `DevPass123!` |
+
+## Running Tests (Lab 3)
+
+From the repository root:
+
+```bash
+npm run test          # server (Vitest/Supertest) + client (Vitest/Testing Library)
+npm run test:e2e       # Playwright: e2e/lab-02 (migrated) + e2e/lab-03 (new), Chromium only
+```
+
+`test:e2e` needs both dev servers running first (`npm run dev` in another terminal) — Playwright does not start them itself. It seeds its own deterministic fixture accounts and tickets on every run (`e2e/global-setup.ts`) and cleans up nothing destructive in the shared database beyond those fixtures.
+
+All commands must exit with zero failures, with zero skipped or `.only`/`.skip`-marked tests, per the Lab 3 Definition of Done ([`docs/lab-03/specification.md`](docs/lab-03/specification.md) §10). See [`docs/lab-03/tests.md`](docs/lab-03/tests.md) for the full test plan and per-test traceability to Acceptance Criteria.
+
+## Git Workflow (Lab 3)
+
+Same Git Flow-style model, scoped to its own staging branch:
+
+- `main` — stable, production-like branch
+- `lab3-staging` — Lab 3 integration branch
+- `feature/N-name` — one feature branch per GitHub Issue, merged into `lab3-staging` via peer-reviewed Pull Requests
+
+See [`docs/lab-03/reviewer.md`](docs/lab-03/reviewer.md) for peer review records and [`docs/lab-03/ai-use.md`](docs/lab-03/ai-use.md) for the AI usage log.
+
 ## License
 
 Educational project for CPE 334, King Mongkut's University of Technology Thonburi (KMUTT).

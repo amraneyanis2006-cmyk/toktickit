@@ -41,7 +41,7 @@ test.describe('E2E-01: Login -> browse -> logout -> blocked access', () => {
   });
 });
 
-test.describe('E2E-02: Initial password login and change', () => {
+test.describe('AC-02, E2E-02: Initial password login and change', () => {
   test('the normal app opens only after a valid password change', async ({ page }) => {
     await login(page, E2E_MUST_CHANGE_LOGIN.email, E2E_MUST_CHANGE_INITIAL_PASSWORD);
     await expect(page).toHaveURL(/\/change-password$/);

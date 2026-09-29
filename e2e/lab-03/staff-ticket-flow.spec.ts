@@ -67,7 +67,7 @@ test.describe('E2E-04: IT Staff full ticket workflow', () => {
   });
 });
 
-test.describe('RESP-01: Staff Ticket Queue at <768px', () => {
+test.describe('AC-18, RESP-01: Staff Ticket Queue at <768px', () => {
   test('renders as cards, no horizontal scrollbar, at mobile width', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await login(page, E2E_STAFF_B.email, FIXTURE_PASSWORD);

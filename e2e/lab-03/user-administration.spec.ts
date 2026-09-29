@@ -16,7 +16,7 @@ test.describe('E2E-05: Administrator full user lifecycle', () => {
     await createDialog.getByLabel('Email Address').fill(email);
     await createDialog.getByLabel('Role', { exact: false }).selectOption('IT_STAFF');
     await createDialog.getByRole('button', { name: 'Create User' }).click();
-    await expect(page.getByText(/server console/i)).toBeVisible();
+    await expect(page.getByText(/initial password.*shown once/i)).toBeVisible();
     await expect(page.getByRole('dialog')).not.toBeVisible();
 
     // Search / find.
@@ -40,7 +40,7 @@ test.describe('E2E-05: Administrator full user lifecycle', () => {
     const resetDialog = page.getByRole('dialog');
     await resetDialog.getByRole('button', { name: 'Set New Initial Password' }).click();
     await resetDialog.getByRole('button', { name: 'Yes, issue new password' }).click();
-    await expect(page.getByText(/server console/i)).toBeVisible();
+    await expect(page.getByText(/initial password.*shown once/i)).toBeVisible();
 
     // Deactivate (not self, not the last admin).
     await page.getByPlaceholder('Search by name or email...').fill(email);
@@ -84,7 +84,7 @@ test.describe('E2E-06: Admin safety-rule UI', () => {
   });
 });
 
-test.describe('RESP-02: Administrator User Management at <768px', () => {
+test.describe('AC-18, RESP-02: Administrator User Management at <768px', () => {
   test('renders as cards with a full-screen create/edit sheet, no horizontal scroll', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await login(page, E2E_ADMIN.email, FIXTURE_PASSWORD);

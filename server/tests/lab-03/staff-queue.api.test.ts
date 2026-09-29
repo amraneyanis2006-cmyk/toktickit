@@ -244,6 +244,30 @@ describe('GET /api/staff/tickets (API-19, BR-18)', () => {
     expect(res.body.data.length).toBe(2);
   });
 
+  it('AC-17: sortBy/sortDir actually change the returned order (ticketNumber asc vs desc)', async () => {
+    const cookie = await loginAs('sq17-staff-a@example.com', STAFF_PASSWORD);
+
+    const asc = await request(app)
+      .get('/api/staff/tickets')
+      .query({ search: 'SQ17', sortBy: 'ticketNumber', sortDir: 'asc', pageSize: 10 })
+      .set('Cookie', cookie);
+    const desc = await request(app)
+      .get('/api/staff/tickets')
+      .query({ search: 'SQ17', sortBy: 'ticketNumber', sortDir: 'desc', pageSize: 10 })
+      .set('Cookie', cookie);
+
+    expect(asc.status).toBe(200);
+    expect(desc.status).toBe(200);
+
+    const ascNumbers = asc.body.data.map((t: { ticketNumber: string }) => t.ticketNumber);
+    const descNumbers = desc.body.data.map((t: { ticketNumber: string }) => t.ticketNumber);
+
+    expect(ascNumbers).toEqual([
+      'TKT-SQ17-000001', 'TKT-SQ17-000002', 'TKT-SQ17-000003', 'TKT-SQ17-000004',
+    ]);
+    expect(descNumbers).toEqual([...ascNumbers].reverse());
+  });
+
   it('rejects an unauthenticated request with 401', async () => {
     const res = await request(app).get('/api/staff/tickets');
     expect(res.status).toBe(401);
