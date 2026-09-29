@@ -250,9 +250,12 @@ From the **repository root**, install everything and set up the database in one 
 ```bash
 npm install
 npm run install:all      # installs server/ and client/ dependencies too
+npx prisma generate      # generates the Prisma Client from prisma/schema.prisma
 npm run db:migrate       # applies all migrations (Lab 1 through Lab 3)
 npm run db:seed          # seeds Categories, Related Systems, Requesters, IT Staff, Administrator, sample Tickets
 ```
+
+`npx prisma generate` is required and is not always run automatically: newer npm versions can block a dependency's `postinstall` script by default (you may see an `npm warn install-scripts` notice during `npm install`), and `@prisma/client`'s generation step is one such script. Skipping it leaves a stale/incomplete client in place and every database query returns `500 Internal Server Error`, including on the simplest endpoints (e.g. `GET /api/categories`) — this was caught and confirmed by verification against a genuinely fresh clone and a disposable database while preparing the Lab 3 release, exactly the DoD §10 scenario. If any endpoint returns 500 immediately after setup, re-run `npx prisma generate` from the repository root first.
 
 `db:seed` is self-sufficient on a genuinely fresh database: it creates the 5 Lab 2-style Requester accounts (4 active, 1 inactive) directly if they don't already exist. The separate migration-backfill script (`npm run db:migrate-passwords`) is only relevant if you are carrying over a real pre-Lab-3 database that already has `RequesterUser` rows with no password — on a fresh clone it correctly reports "Nothing to do."
 
