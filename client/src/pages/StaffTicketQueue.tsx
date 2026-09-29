@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../api/apiClient';
 
@@ -51,10 +51,12 @@ export default function StaffTicketQueue() {
   const [result, setResult] = useState<QueueResponse | null>(null);
   const [fetchState, setFetchState] = useState<FetchState>('loading');
   const [hasEverHadTickets, setHasEverHadTickets] = useState<boolean | null>(null);
+  const latestRequestId = useRef(0);
 
   const filtersActive = Boolean(search || status || priority || ownership !== 'all');
 
   const loadQueue = useCallback(async () => {
+    const requestId = ++latestRequestId.current;
     setFetchState('loading');
     try {
       const params = new URLSearchParams();
@@ -68,6 +70,7 @@ export default function StaffTicketQueue() {
       params.set('pageSize', String(pageSize));
 
       const res = await apiFetch<QueueResponse>(`/staff/tickets?${params.toString()}`);
+      if (requestId !== latestRequestId.current) return; // a newer request has already superseded this one
       setResult(res);
       setFetchState('success');
 
@@ -77,7 +80,7 @@ export default function StaffTicketQueue() {
         setHasEverHadTickets(true);
       }
     } catch {
-      setFetchState('error');
+      if (requestId === latestRequestId.current) setFetchState('error');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, status, priority, ownership, sortBy, sortDir, page, pageSize]);

@@ -26,29 +26,15 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const CONSOLE_NOTE = 'It was written to the server console (local testing only).';
 
-// Badge colours come from ui-spec.md sec 2. Inline with fallbacks because the role badges
-// have no CSS class yet; to be consolidated into zen-green.css during the visual QA pass.
-function Pill({ label, bg, color }: { label: string; bg: string; color: string }) {
-  return (
-    <span className="zg-badge" style={{ backgroundColor: bg, color }}>
-      {label}
-    </span>
-  );
-}
-
+// Badge classes live in zen-green.css (.zg-badge-role-*, .zg-badge-active-*),
+// consolidated there during the #20 visual QA pass per ui-spec.md sec 2.
 function RoleBadge({ role }: { role: Role }) {
-  if (role === 'IT_STAFF') return <Pill label="IT Staff" bg="#E7F0FA" color="#1F5F9C" />;
-  if (role === 'ADMINISTRATOR') {
-    return <Pill label="Administrator" bg="var(--zg-pale, #EAF6EF)" color="var(--zg-primary, #006B3C)" />;
-  }
-  return <Pill label="Requester" bg="var(--zg-neutral-bg, #EEF1EF)" color="var(--zg-neutral-text, #46524B)" />;
+  return <span className={`zg-badge zg-badge-role-${role.toLowerCase()}`}>{ROLE_LABEL[role]}</span>;
 }
 
 function ActiveBadge({ isActive }: { isActive: boolean }) {
-  return isActive ? (
-    <Pill label="Active" bg="var(--zg-pale, #EAF6EF)" color="var(--zg-secondary, #0B7A46)" />
-  ) : (
-    <Pill label="Inactive" bg="var(--zg-error-bg, #FBEAE9)" color="var(--zg-error, #B3261E)" />
+  return (
+    <span className={`zg-badge zg-badge-active-${isActive}`}>{isActive ? 'Active' : 'Inactive'}</span>
   );
 }
 
@@ -381,6 +367,7 @@ export default function UserManagement() {
 
   const [users, setUsers] = useState<UserRow[]>([]);
   const [fetchState, setFetchState] = useState<FetchState>('loading');
+  const latestRequestId = useRef(0);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [activeAdminCount, setActiveAdminCount] = useState<number | null>(null);
@@ -390,6 +377,7 @@ export default function UserManagement() {
   const filtersActive = Boolean(search.trim() || roleFilter);
 
   const loadUsers = useCallback(async () => {
+    const requestId = ++latestRequestId.current;
     setFetchState('loading');
     try {
       const params = new URLSearchParams();
@@ -397,10 +385,11 @@ export default function UserManagement() {
       if (roleFilter) params.set('role', roleFilter);
       const qs = params.toString();
       const data = await apiFetch<UserRow[]>(`/admin/users${qs ? `?${qs}` : ''}`);
+      if (requestId !== latestRequestId.current) return; // a newer request has already superseded this one
       setUsers(data);
       setFetchState('success');
     } catch {
-      setFetchState('error');
+      if (requestId === latestRequestId.current) setFetchState('error');
     }
   }, [search, roleFilter]);
 

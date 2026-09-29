@@ -64,7 +64,7 @@ export default function AppShell() {
                   data-bs-toggle="dropdown"
                   aria-expanded="false"
                 >
-                  👤 {user.name} <span className="badge bg-light text-dark ms-1">{user.role.replace('_', ' ')}</span>
+                  👤 {user.name} <span className="badge bg-light text-dark ms-1">{user.role.replace(/_/g, ' ')}</span>
                 </button>
                 <ul className="dropdown-menu dropdown-menu-end">
                   <li>

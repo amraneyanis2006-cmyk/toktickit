@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { selectRequester } from '../../helpers';
+import { login } from '../../helpers';
+import { E2E_REQUESTER_A, FIXTURE_PASSWORD } from '../../global-setup';
 
 test.describe('VIS-01: Zen Green token conformance', () => {
   test.beforeEach(async ({ page }) => {
@@ -7,7 +8,7 @@ test.describe('VIS-01: Zen Green token conformance', () => {
   });
 
   test('header uses the --zg-primary background token', async ({ page }) => {
-    await selectRequester(page);
+    await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
     await page.locator('.zg-header').waitFor({ state: 'visible' });
 
     const headerBg = await page.evaluate(() => {
@@ -29,7 +30,7 @@ test.describe('VIS-01: Zen Green token conformance', () => {
   });
 
   test('primary button uses the --zg-primary token family', async ({ page }) => {
-    await selectRequester(page);
+    await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
     await page.goto('/tickets/new');
 
     const button = page.locator('.btn-zg-primary').first();
@@ -44,7 +45,7 @@ test.describe('VIS-01: Zen Green token conformance', () => {
   });
 
   test('badges render with token-defined colors on Ticket Detail', async ({ page }) => {
-    await selectRequester(page);
+    await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
     await page.waitForSelector('tbody tr');
     await page.locator('tbody tr').first().click();
     await page.waitForURL('**/tickets/TKT-*');
