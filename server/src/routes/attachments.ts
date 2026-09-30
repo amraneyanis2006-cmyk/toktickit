@@ -1,10 +1,11 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
 import multer from 'multer';
 import { randomUUID } from 'crypto';
 import path from 'path';
 import fs from 'fs/promises';
-import { requireActiveRequester } from '../middleware/requesterContext';
+import { requireAuth, requirePasswordChanged, requireRole } from '../middleware/auth';
 import { validateAttachment, MAX_ATTACHMENT_SIZE } from '../utils/validation';
 
 const router = Router();
@@ -34,7 +35,9 @@ const upload = multer({
 // ──────────────────────────────────────────────
 router.post(
   '/tickets/:ticketNumber/attachments',
-  requireActiveRequester,
+  requireAuth,
+  requirePasswordChanged,
+  requireRole('REQUESTER'),
   (req: Request, res: Response, next: NextFunction) => {
     upload.single('file')(req, res, (err: any) => {
       if (err) {
@@ -61,7 +64,7 @@ router.post(
   },
   async (req: Request, res: Response) => {
     try {
-      const requesterId = req.requester!.id;
+      const requesterId = req.user!.id;
       const { ticketNumber } = req.params;
 
       if (!req.file) {
@@ -72,7 +75,7 @@ router.post(
       }
 
       const ticket = await prisma.ticket.findFirst({
-        where: { ticketNumber, requesterId }, // BR-27: ownership check inside the query itself
+        where: { ticketNumber: ticketNumber as string, requesterId }, // BR-27: ownership check inside the query itself
       });
 
       if (!ticket) {
@@ -142,9 +145,9 @@ router.post(
 // ──────────────────────────────────────────────
 // GET /api/attachments/:id/download - Télécharger un attachment actif
 // ──────────────────────────────────────────────
-router.get('/attachments/:id/download', requireActiveRequester, async (req: Request, res: Response) => {
+router.get('/attachments/:id/download', requireAuth, requirePasswordChanged, requireRole('REQUESTER'), async (req: Request, res: Response) => {
   try {
-    const requesterId = req.requester!.id;
+    const requesterId = req.user!.id;
     const id = Number(req.params.id);
 
     if (!Number.isInteger(id)) {
@@ -191,9 +194,9 @@ router.get('/attachments/:id/download', requireActiveRequester, async (req: Requ
 // ──────────────────────────────────────────────
 // PATCH /api/attachments/:id/remove - Soft-remove d'un attachment actif
 // ──────────────────────────────────────────────
-router.patch('/attachments/:id/remove', requireActiveRequester, async (req: Request, res: Response) => {
+router.patch('/attachments/:id/remove', requireAuth, requirePasswordChanged, requireRole('REQUESTER'), async (req: Request, res: Response) => {
   try {
-    const requesterId = req.requester!.id;
+    const requesterId = req.user!.id;
     const id = Number(req.params.id);
     const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
 

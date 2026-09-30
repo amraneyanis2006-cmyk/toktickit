@@ -8,6 +8,7 @@
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.4",
+    "@types/bcrypt": "^6.0.0",
     "@types/node": "^20.0.0",
     "@types/supertest": "^6.0.0",
     "jsdom": "^30.0.1",
@@ -19,10 +20,23 @@
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "bcrypt": "^6.0.0",
     "prisma": "^5.22.0"
   },
   "prisma": {
     "seed": "npx ts-node --esm prisma/seed.ts"
   },
-  "scripts": {}
+  "scripts": {
+    "dev": "npm run dev:server & npm run dev:client",
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "install:all": "npm install && npm install --prefix server && npm install --prefix client",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate-passwords": "tsx scripts/migrate-lab2-passwords.ts",
+    "db:seed": "prisma db seed",
+    "test:server": "npm run test --prefix server",
+    "test:client": "npm run test --prefix client",
+    "test": "npm run test:server && npm run test:client",
+    "test:e2e": "playwright test"
+  }
 }

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { selectRequester } from '../../helpers';
+import { login } from '../../helpers';
+import { E2E_REQUESTER_A, FIXTURE_PASSWORD } from '../../global-setup';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -9,7 +10,7 @@ const filePath = path.join(__dirname, '../fixtures/test-image.png');
 test.describe('RESP-03: Ticket Detail responsive at 375px', () => {
   test('attachment rows stay usable, action buttons are tappable (>=44px)', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await selectRequester(page);
+    await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
 
     const firstCard = page.locator('.d-md-none .zg-card.p-3').first();
     await firstCard.waitFor({ state: 'visible' });

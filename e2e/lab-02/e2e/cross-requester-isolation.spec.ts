@@ -1,12 +1,13 @@
 import { test, expect } from '@playwright/test';
-import { selectRequester } from '../../helpers';
+import { login } from '../../helpers';
+import { E2E_REQUESTER_A, E2E_REQUESTER_B, FIXTURE_PASSWORD } from '../../global-setup';
 
 test.describe('E2E-02: Cross-Requester isolation', () => {
   test('a ticket created by one Requester is invisible to another', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
 
     // Create a ticket as Requester A.
-    await selectRequester(page, 'Jennifer Anderson');
+    await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
     await page.getByRole('link', { name: '+ Create Ticket' }).click();
     await page.waitForURL('**/tickets/new');
     await page.waitForSelector('#category');
@@ -23,7 +24,7 @@ test.describe('E2E-02: Cross-Requester isolation', () => {
     expect(ticketNumberText).toMatch(/TKT-\d{4}-\d+/);
 
     // Switch to Requester B (a different dev requester).
-    await selectRequester(page, 'Michael Brown');
+    await login(page, E2E_REQUESTER_B.email, FIXTURE_PASSWORD);
 
     // 1. Not visible in Requester B's My Tickets list.
     await page.waitForSelector('h1:has-text("My Tickets")');

@@ -13,26 +13,19 @@ export class ApiError extends Error {
   }
 }
 
-interface RequestOptions extends RequestInit {
-  requesterId?: number | null;
-}
-
 /**
  * Shared fetch wrapper for the TokTickIT API.
  *
- * When `requesterId` is provided, attaches the temporary Lab 2 `x-requester-id`
- * header (see api-spec.md §0). This header is a TESTING MECHANISM ONLY.
+ * `credentials: 'include'` is required for every request: the client and
+ * server run on different ports, and without it the browser will not send
+ * the `sid` session cookie set by POST /api/auth/login (api-spec.md sec 0).
  */
-export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { requesterId, headers, ...rest } = options;
+export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const { headers, ...rest } = options;
 
   const finalHeaders: Record<string, string> = {
     ...(headers as Record<string, string>),
   };
-
-  if (requesterId != null) {
-    finalHeaders['x-requester-id'] = String(requesterId);
-  }
 
   if (rest.body && !(rest.body instanceof FormData)) {
     finalHeaders['Content-Type'] = 'application/json';
@@ -42,6 +35,7 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...rest,
+      credentials: 'include',
       headers: finalHeaders,
     });
   } catch (networkError) {

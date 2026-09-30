@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { selectRequester } from '../../helpers';
+import { login } from '../../helpers';
+import { E2E_REQUESTER_A, FIXTURE_PASSWORD } from '../../global-setup';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -11,7 +12,7 @@ test.describe('E2E-03: Attachment lifecycle (add, download, remove)', () => {
     page.on('dialog', (dialog) => dialog.accept('E2E-03 removal reason.'));
 
     await page.setViewportSize({ width: 1280, height: 900 });
-    await selectRequester(page, 'Jennifer Anderson');
+    await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
 
     // Create a fresh ticket so this test doesn't depend on any
     // pre-existing attachment state.

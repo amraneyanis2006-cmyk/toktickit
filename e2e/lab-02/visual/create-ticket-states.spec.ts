@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { selectRequester } from '../../helpers';
+import { login } from '../../helpers';
+import { E2E_REQUESTER_A, FIXTURE_PASSWORD } from '../../global-setup';
 
 const BREAKPOINTS = [
   { name: 'desktop', width: 1280, height: 900 },
@@ -13,7 +14,7 @@ for (const bp of BREAKPOINTS) {
     });
 
     test('initial state', async ({ page }) => {
-      await selectRequester(page);
+      await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
       await page.goto('/tickets/new');
       await page.waitForSelector('#category');
       await page.screenshot({
@@ -23,7 +24,7 @@ for (const bp of BREAKPOINTS) {
     });
 
     test('validation-error state', async ({ page }) => {
-      await selectRequester(page);
+      await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
       await page.goto('/tickets/new');
       await page.waitForSelector('#category');
       await page.getByRole('button', { name: 'Submit Ticket' }).click();
@@ -35,7 +36,7 @@ for (const bp of BREAKPOINTS) {
     });
 
     test('submitting state', async ({ page }) => {
-      await selectRequester(page);
+      await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
       await page.goto('/tickets/new');
       await page.waitForSelector('#category');
 
@@ -62,7 +63,7 @@ for (const bp of BREAKPOINTS) {
     });
 
     test('success state', async ({ page }) => {
-      await selectRequester(page);
+      await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
       await page.goto('/tickets/new');
       await page.waitForSelector('#category');
 
@@ -80,7 +81,7 @@ for (const bp of BREAKPOINTS) {
     });
 
     test('api-failure state', async ({ page }) => {
-      await selectRequester(page);
+      await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
       await page.goto('/tickets/new');
       await page.waitForSelector('#category');
 
@@ -110,7 +111,7 @@ for (const bp of BREAKPOINTS) {
     });
 
     test('invalid-attachment state', async ({ page }) => {
-      await selectRequester(page);
+      await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
       await page.goto('/tickets/new');
       await page.waitForSelector('#category');
 

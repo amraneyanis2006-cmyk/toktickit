@@ -1,7 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { apiFetch, ApiError } from '../api/apiClient';
-import { useRequester } from '../context/RequesterContext';
+import { apiFetch } from '../api/apiClient';
 
 interface RefItem {
   id: number;
@@ -29,7 +28,10 @@ type SortField = 'ticketNumber' | 'createdAt' | 'updatedAt';
 type FetchState = 'loading' | 'success' | 'error';
 
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH'];
-const STATUSES = ['NEW', 'OPEN', 'IN_PROGRESS', 'RESOLVED'];
+const STATUSES = [
+  'NEW', 'OPEN', 'IN_PROGRESS', 'WAITING_FOR_REQUESTER',
+  'RESOLVED', 'CLOSED', 'REOPENED', 'CANCELLED',
+];
 const PAGE_SIZES = [10, 20, 50];
 
 function PriorityBadge({ value }: { value: string }) {
@@ -37,11 +39,10 @@ function PriorityBadge({ value }: { value: string }) {
 }
 
 function StatusBadge({ value }: { value: string }) {
-  return <span className={`zg-badge zg-badge-status-${value.toLowerCase()}`}>{value.replace('_', ' ')}</span>;
+  return <span className={`zg-badge zg-badge-status-${value.toLowerCase()}`}>{value.replace(/_/g, ' ')}</span>;
 }
 
 export default function MyTickets() {
-  const { requester } = useRequester();
   const navigate = useNavigate();
   const [categories, setCategories] = useState<RefItem[]>([]);
 
@@ -57,10 +58,12 @@ export default function MyTickets() {
   const [result, setResult] = useState<TicketsResponse | null>(null);
   const [fetchState, setFetchState] = useState<FetchState>('loading');
   const [hasEverHadTickets, setHasEverHadTickets] = useState<boolean | null>(null);
+  const latestRequestId = useRef(0);
 
   const filtersActive = Boolean(search || category || priority || status);
 
   const loadTickets = useCallback(async () => {
+    const requestId = ++latestRequestId.current;
     setFetchState('loading');
     try {
       const params = new URLSearchParams();
@@ -73,9 +76,8 @@ export default function MyTickets() {
       params.set('page', String(page));
       params.set('pageSize', String(pageSize));
 
-      const res = await apiFetch<TicketsResponse>(`/tickets?${params.toString()}`, {
-        requesterId: requester?.id,
-      });
+      const res = await apiFetch<TicketsResponse>(`/tickets?${params.toString()}`);
+      if (requestId !== latestRequestId.current) return; // a newer request has already superseded this one
       setResult(res);
       setFetchState('success');
 
@@ -88,10 +90,10 @@ export default function MyTickets() {
         setHasEverHadTickets(true);
       }
     } catch {
-      setFetchState('error');
+      if (requestId === latestRequestId.current) setFetchState('error');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requester?.id, search, category, priority, status, sortBy, sortDir, page, pageSize]);
+  }, [search, category, priority, status, sortBy, sortDir, page, pageSize]);
 
   useEffect(() => {
     apiFetch<RefItem[]>('/categories').then(setCategories).catch(() => {});
@@ -204,7 +206,7 @@ export default function MyTickets() {
             <option value="">All Statuses</option>
             {STATUSES.map((s) => (
               <option key={s} value={s}>
-                {s.replace('_', ' ')}
+                {s.replace(/_/g, ' ')}
               </option>
             ))}
           </select>

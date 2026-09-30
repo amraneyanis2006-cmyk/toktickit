@@ -1,14 +1,8 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { useRequester } from '../context/RequesterContext';
+import { NavLink, Outlet } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function AppShell() {
-  const { requester, clearRequester } = useRequester();
-  const navigate = useNavigate();
-
-  const handleChangeRequester = () => {
-    clearRequester();
-    navigate('/select-requester');
-  };
+  const { user, logout } = useAuth();
 
   return (
     <div>
@@ -32,19 +26,37 @@ export default function AppShell() {
 
           <div className="collapse navbar-collapse" id="zgNavContent">
             <ul className="navbar-nav me-auto">
-              <li className="nav-item">
-                <NavLink to="/tickets" className="nav-link">
-                  📄 My Tickets
-                </NavLink>
-              </li>
-              <li className="nav-item">
-                <NavLink to="/tickets/new" className="nav-link">
-                  ➕ Create Ticket
-                </NavLink>
-              </li>
+              {user?.role === 'REQUESTER' && (
+                <>
+                  <li className="nav-item">
+                    <NavLink to="/tickets" className="nav-link">
+                      📄 My Tickets
+                    </NavLink>
+                  </li>
+                  <li className="nav-item">
+                    <NavLink to="/tickets/new" className="nav-link">
+                      ➕ Create Ticket
+                    </NavLink>
+                  </li>
+                </>
+              )}
+              {(user?.role === 'IT_STAFF' || user?.role === 'ADMINISTRATOR') && (
+                <li className="nav-item">
+                  <NavLink to="/staff/tickets" className="nav-link">
+                    🗂️ Ticket Queue
+                  </NavLink>
+                </li>
+              )}
+              {user?.role === 'ADMINISTRATOR' && (
+                <li className="nav-item">
+                  <NavLink to="/admin/users" className="nav-link">
+                    👥 Users
+                  </NavLink>
+                </li>
+              )}
             </ul>
 
-            {requester && (
+            {user && (
               <div className="dropdown">
                 <button
                   className="btn btn-sm text-white dropdown-toggle"
@@ -52,12 +64,12 @@ export default function AppShell() {
                   data-bs-toggle="dropdown"
                   aria-expanded="false"
                 >
-                  👤 {requester.name}
+                  👤 {user.name} <span className="badge bg-light text-dark ms-1">{user.role.replace(/_/g, ' ')}</span>
                 </button>
                 <ul className="dropdown-menu dropdown-menu-end">
                   <li>
-                    <button className="dropdown-item" onClick={handleChangeRequester}>
-                      Change Requester
+                    <button className="dropdown-item" onClick={() => logout()}>
+                      Logout
                     </button>
                   </li>
                 </ul>

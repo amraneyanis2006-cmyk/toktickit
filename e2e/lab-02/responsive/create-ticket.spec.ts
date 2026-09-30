@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { selectRequester } from '../../helpers';
+import { login } from '../../helpers';
+import { E2E_REQUESTER_A, FIXTURE_PASSWORD } from '../../global-setup';
 
 // NOTE: ui-spec.md/tests.md describe a 3-tier layout (1-col mobile,
 // 2-col tablet, "full" desktop). CreateTicket.tsx only uses Bootstrap's
@@ -10,7 +11,7 @@ import { selectRequester } from '../../helpers';
 test.describe('RESP-02: Create Ticket responsive at 375px / 800px / 1280px', () => {
   test('stacks single-column below 768px, no clipped labels', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await selectRequester(page);
+    await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
     await page.goto('/tickets/new');
 
     const hasHorizontalScroll = await page.evaluate(
@@ -26,7 +27,7 @@ test.describe('RESP-02: Create Ticket responsive at 375px / 800px / 1280px', () 
 
   test('renders multi-column layout at 800px (tablet)', async ({ page }) => {
     await page.setViewportSize({ width: 800, height: 1024 });
-    await selectRequester(page);
+    await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
     await page.goto('/tickets/new');
 
     const hasHorizontalScroll = await page.evaluate(
@@ -42,7 +43,7 @@ test.describe('RESP-02: Create Ticket responsive at 375px / 800px / 1280px', () 
 
   test('renders full layout at 1280px (desktop) — identical column structure to tablet', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
-    await selectRequester(page);
+    await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
     await page.goto('/tickets/new');
 
     const hasHorizontalScroll = await page.evaluate(

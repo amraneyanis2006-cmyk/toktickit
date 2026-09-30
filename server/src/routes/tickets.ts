@@ -1,8 +1,9 @@
-import { Router, Request, Response } from 'express';
+import { Router } from 'express';
+import type { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { requireActiveRequester } from '../middleware/requesterContext';
+import { requireAuth, requirePasswordChanged, requireRole } from '../middleware/auth';
 import { generateTicketNumber } from '../utils/ticketNumber';
-import { validateTicketFields, normalizePagination } from '../utils/validation';
+import { validateTicketFields, normalizePagination, validateCommentContent } from '../utils/validation';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -10,7 +11,7 @@ const prisma = new PrismaClient();
 // ──────────────────────────────────────────────
 // POST /api/tickets - Créer un ticket
 // ──────────────────────────────────────────────
-router.post('/tickets', requireActiveRequester, async (req: Request, res: Response) => {
+router.post('/tickets', requireAuth, requirePasswordChanged, requireRole('REQUESTER'), async (req: Request, res: Response) => {
   try {
     const {
       categoryId,
@@ -20,7 +21,7 @@ router.post('/tickets', requireActiveRequester, async (req: Request, res: Respon
       description
     } = req.body;
 
-    const requesterId = req.requester!.id;
+    const requesterId = req.user!.id;
 
     // UNIT-03: Summary/Description length + trim validation, extracted to
     // utils/validation.ts so it's testable in isolation from HTTP/DB.
@@ -123,9 +124,9 @@ router.post('/tickets', requireActiveRequester, async (req: Request, res: Respon
 // ──────────────────────────────────────────────
 // GET /api/tickets - Liste paginée des tickets
 // ──────────────────────────────────────────────
-router.get('/tickets', requireActiveRequester, async (req: Request, res: Response) => {
+router.get('/tickets', requireAuth, requirePasswordChanged, requireRole('REQUESTER'), async (req: Request, res: Response) => {
   try {
-    const requesterId = req.requester!.id;
+    const requesterId = req.user!.id;
 
     // PAGINATION — UNIT-05: normalizePagination extracted to utils/validation.ts
     const { page, pageSize } = normalizePagination({
@@ -221,18 +222,22 @@ router.get('/tickets', requireActiveRequester, async (req: Request, res: Respons
 // ──────────────────────────────────────────────
 // GET /api/tickets/:ticketNumber - Détail d'un ticket + attachments
 // ──────────────────────────────────────────────
-router.get('/tickets/:ticketNumber', requireActiveRequester, async (req: Request, res: Response) => {
+router.get('/tickets/:ticketNumber', requireAuth, requirePasswordChanged, requireRole('REQUESTER'), async (req: Request, res: Response) => {
   try {
-    const requesterId = req.requester!.id;
+    const requesterId = req.user!.id;
     const { ticketNumber } = req.params;
 
     const ticket = await prisma.ticket.findFirst({
-      where: { ticketNumber, requesterId }, // BR-27: ownership check inside the query itself
+      where: { ticketNumber: ticketNumber as string, requesterId }, // BR-27: ownership check inside the query itself
       include: {
         category: { select: { id: true, name: true } },
         relatedSystem: { select: { id: true, name: true } },
         attachments: {
           orderBy: { uploadedAt: 'desc' },
+        },
+        publicComments: {
+          orderBy: { createdAt: 'asc' },
+          include: { author: { select: { id: true, name: true, role: true } } },
         },
       },
     });
@@ -257,6 +262,7 @@ router.get('/tickets/:ticketNumber', requireActiveRequester, async (req: Request
       requestedPriority: ticket.requestedPriority,
       itPriority: ticket.itPriority,
       currentStatus: ticket.currentStatus,
+      requesterIndicatedResolved: ticket.requesterIndicatedResolved,
       createdAt: ticket.createdAt,
       updatedAt: ticket.updatedAt,
       attachments: ticket.attachments.map(a => ({
@@ -271,6 +277,15 @@ router.get('/tickets/:ticketNumber', requireActiveRequester, async (req: Request
           removalReason: a.removalReason,
         }),
       })),
+      publicComments: ticket.publicComments.map(c => ({
+        id: c.id,
+        ticketId: c.ticketId,
+        authorId: c.author.id,
+        authorName: c.author.name,
+        authorRole: c.author.role,
+        content: c.content,
+        createdAt: c.createdAt,
+      })),
     });
 
   } catch (error) {
@@ -281,5 +296,112 @@ router.get('/tickets/:ticketNumber', requireActiveRequester, async (req: Request
     });
   }
 });
+
+// --------------------------------------------------
+// POST /api/tickets/:ticketNumber/comments - Post a Public Comment
+// Allowed for the owning Requester, or any IT Staff / Administrator (api-spec.md sec 6).
+// --------------------------------------------------
+router.post(
+  '/tickets/:ticketNumber/comments',
+  requireAuth,
+  requirePasswordChanged,
+  async (req: Request, res: Response) => {
+    try {
+      const { ticketNumber } = req.params;
+      const validation = validateCommentContent(req.body?.content);
+
+      if (!validation.valid) {
+        return res.status(400).json({
+          error: 'VALIDATION_ERROR',
+          message: validation.error,
+        });
+      }
+
+      const isOwnerScoped = req.user!.role === 'REQUESTER';
+      const ticket = await prisma.ticket.findFirst({
+        where: isOwnerScoped
+          ? { ticketNumber: ticketNumber as string, requesterId: req.user!.id }
+          : { ticketNumber: ticketNumber as string },
+      });
+
+      if (!ticket) {
+        // BR-26: identical response whether the ticket doesn't exist at all,
+        // or exists but isn't owned by this Requester.
+        return res.status(404).json({
+          error: 'NOT_FOUND',
+          message: 'Ticket not found.',
+        });
+      }
+
+      const comment = await prisma.ticketComment.create({
+        data: {
+          ticketId: ticket.id,
+          authorId: req.user!.id,
+          content: validation.trimmed!,
+        },
+      });
+
+      res.status(201).json({
+        id: comment.id,
+        ticketId: comment.ticketId,
+        authorId: req.user!.id,
+        authorName: req.user!.name,
+        authorRole: req.user!.role,
+        content: comment.content,
+        createdAt: comment.createdAt,
+      });
+    } catch (error) {
+      console.error('Error posting comment:', error);
+      res.status(500).json({
+        error: 'INTERNAL_ERROR',
+        message: 'Unable to post comment.',
+      });
+    }
+  }
+);
+
+// --------------------------------------------------
+// PATCH /api/tickets/:ticketNumber/resolved-indication - Requester marks
+// the problem as appearing resolved (FR-09, BR-09). Idempotent; never
+// changes currentStatus.
+// --------------------------------------------------
+router.patch(
+  '/tickets/:ticketNumber/resolved-indication',
+  requireAuth,
+  requirePasswordChanged,
+  requireRole('REQUESTER'),
+  async (req: Request, res: Response) => {
+    try {
+      const { ticketNumber } = req.params;
+
+      const ticket = await prisma.ticket.findFirst({
+        where: { ticketNumber: ticketNumber as string, requesterId: req.user!.id },
+      });
+
+      if (!ticket) {
+        return res.status(404).json({
+          error: 'NOT_FOUND',
+          message: 'Ticket not found.',
+        });
+      }
+
+      const updated = await prisma.ticket.update({
+        where: { id: ticket.id },
+        data: { requesterIndicatedResolved: true },
+      });
+
+      res.status(200).json({
+        ticketNumber: updated.ticketNumber,
+        requesterIndicatedResolved: updated.requesterIndicatedResolved,
+      });
+    } catch (error) {
+      console.error('Error setting resolved-indication:', error);
+      res.status(500).json({
+        error: 'INTERNAL_ERROR',
+        message: 'Unable to update ticket.',
+      });
+    }
+  }
+);
 
 export default router;

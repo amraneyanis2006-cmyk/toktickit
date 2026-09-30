@@ -91,3 +91,30 @@ export function normalizePagination(input: {
 
   return { page, pageSize };
 }
+
+
+export interface CommentValidationResult {
+  valid: boolean;
+  error?: string;
+  trimmed?: string;
+}
+
+/**
+ * Validates Public Comment / Internal Note content per BR-15: required,
+ * trimmed, rejected if empty/whitespace-only, max 2000 characters. Shared
+ * by POST /tickets/:ticketNumber/comments (Issue #16) and
+ * POST /staff/tickets/:ticketNumber/notes (Issue #18).
+ */
+export function validateCommentContent(content: unknown): CommentValidationResult {
+  if (typeof content !== 'string') {
+    return { valid: false, error: 'Content is required.' };
+  }
+  const trimmed = content.trim();
+  if (trimmed.length === 0) {
+    return { valid: false, error: 'Content is required.' };
+  }
+  if (trimmed.length > 2000) {
+    return { valid: false, error: 'Content must not exceed 2000 characters.' };
+  }
+  return { valid: true, trimmed };
+}

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { selectRequester } from '../../helpers';
+import { login } from '../../helpers';
+import { E2E_REQUESTER_A, FIXTURE_PASSWORD } from '../../global-setup';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -12,7 +13,7 @@ test.describe('Ticket Detail screenshot states (desktop)', () => {
   });
 
   test('loaded state', async ({ page }) => {
-    await selectRequester(page, 'Jennifer Anderson');
+    await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
     await page.waitForSelector('tbody tr');
     await page.locator('tbody tr').first().click();
     await page.waitForURL('**/tickets/TKT-*');
@@ -23,7 +24,7 @@ test.describe('Ticket Detail screenshot states (desktop)', () => {
   });
 
   test('attachment-added state', async ({ page }) => {
-    await selectRequester(page, 'Jennifer Anderson');
+    await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
     await page.waitForSelector('tbody tr');
     await page.locator('tbody tr').first().click();
     await page.waitForURL('**/tickets/TKT-*');
@@ -43,7 +44,7 @@ test.describe('Ticket Detail screenshot states (desktop)', () => {
   test('attachment-removed state', async ({ page }) => {
     page.on('dialog', (dialog) => dialog.accept('Screenshot test removal reason.'));
 
-    await selectRequester(page, 'Jennifer Anderson');
+    await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
     await page.waitForSelector('tbody tr');
     await page.locator('tbody tr').first().click();
     await page.waitForURL('**/tickets/TKT-*');
@@ -67,7 +68,7 @@ test.describe('Ticket Detail screenshot states (desktop)', () => {
 test.describe('Ticket Detail screenshot states (mobile)', () => {
   test('mobile state', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await selectRequester(page, 'Jennifer Anderson');
+    await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
     await page.waitForSelector('.d-md-none .zg-card.p-3');
     await page.locator('.d-md-none .zg-card.p-3').first().click();
     await page.waitForURL('**/tickets/TKT-*');
