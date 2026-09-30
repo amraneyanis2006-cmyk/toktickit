@@ -156,6 +156,26 @@ async function main() {
     seq++;
   }
 
+  // Sync the real ticket-numbering sequence (used by generateTicketNumber() for
+  // every ticket created through the live API) with the highest number this
+  // seed's own hardcoded TKT-2026-* tickets consume. Without this, the sequence
+  // starts at 0/whatever it already was and the very next real ticket-creation
+  // calls collide with these seeded ticketNumbers (P2002 unique constraint) -
+  // found via a genuine clean-clone DoD verification: on a freshly seeded
+  // database, the first 3 real ticket-creation attempts failed outright (the
+  // route's retry budget is 3 attempts, and 8 seeded numbers were in the way).
+  // Only ever ADVANCES the counter, never rewinds it - a database with real
+  // tickets already past this range (any non-fresh, actively used database)
+  // is left untouched, so this stays safe to re-run.
+  const highestSeededTicketSeq = seq - 1; // ticketSeeds.length, i.e. 8
+  const existingSequence = await prisma.ticketSequence.findUnique({ where: { year: 2026 } });
+  const targetLastSeq = Math.max(existingSequence?.lastSeq ?? 0, highestSeededTicketSeq);
+  await prisma.ticketSequence.upsert({
+    where: { year: 2026 },
+    create: { year: 2026, lastSeq: targetLastSeq },
+    update: { lastSeq: targetLastSeq },
+  });
+
   console.log("Lab 3 seed complete.");
   console.log(`  Requesters: ${requesters.length} active (already-migrated Lab 2 accounts left untouched, or freshly seeded as fallback on a clean database)`);
   console.log(`  IT Staff:   ${staff.length} (1 inactive)`);
