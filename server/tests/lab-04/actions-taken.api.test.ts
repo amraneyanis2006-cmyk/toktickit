@@ -243,40 +243,55 @@ describe('PATCH /api/staff/tickets/:ticketNumber/actions/:actionId', () => {
     expect(edit.body.error).toBe('ACTION_LOCKED');
   });
 
-  it('API-10: rejects illegal action transitions with 409 INVALID_ACTION_TRANSITION', async () => {
+  it('API-10: a status change on a COMPLETED or CANCELLED action is 409 ACTION_LOCKED', async () => {
     const ticket = await createTicket(prisma, fx);
     const statusOf = (id: number) => `${actionsUrl(ticket.ticketNumber)}/${id}/status`;
 
     const a = await createAction(ticket.ticketNumber, { result: 'done' });
     const completed = await request(app).patch(statusOf(a.body.id)).set('Cookie', staffCookie)
       .send({ status: 'COMPLETED', expectedUpdatedAt: a.body.updatedAt });
-    const back = await request(app).patch(statusOf(a.body.id)).set('Cookie', staffCookie)
-      .send({ status: 'IN_PROGRESS', expectedUpdatedAt: completed.body.updatedAt });
-    expect(back.status).toBe(409);
-    expect(back.body.error).toBe('INVALID_ACTION_TRANSITION');
+    expect(completed.status).toBe(200);
+    for (const status of ['IN_PROGRESS', 'CANCELLED', 'COMPLETED', 'PLANNED']) {
+      const res = await request(app).patch(statusOf(a.body.id)).set('Cookie', staffCookie)
+        .send({ status, result: 'x', expectedUpdatedAt: completed.body.updatedAt });
+      expect(res.status, `COMPLETED -> ${status}`).toBe(409);
+      expect(res.body.error).toBe('ACTION_LOCKED');
+    }
 
     const b = await createAction(ticket.ticketNumber);
     const cancelled = await request(app).patch(statusOf(b.body.id)).set('Cookie', staffCookie)
       .send({ status: 'CANCELLED', expectedUpdatedAt: b.body.updatedAt });
-    const revive = await request(app).patch(statusOf(b.body.id)).set('Cookie', staffCookie)
-      .send({ status: 'COMPLETED', result: 'x', expectedUpdatedAt: cancelled.body.updatedAt });
-    expect(revive.status).toBe(409);
-    expect(revive.body.error).toBe('INVALID_ACTION_TRANSITION');
+    for (const status of ['COMPLETED', 'IN_PROGRESS']) {
+      const res = await request(app).patch(statusOf(b.body.id)).set('Cookie', staffCookie)
+        .send({ status, result: 'x', expectedUpdatedAt: cancelled.body.updatedAt });
+      expect(res.status, `CANCELLED -> ${status}`).toBe(409);
+      expect(res.body.error).toBe('ACTION_LOCKED');
+    }
+    const rows = await prisma.actionTaken.findMany({ where: { id: { in: [a.body.id, b.body.id] } }, orderBy: { id: 'asc' } });
+    expect(rows.map((r) => r.status)).toEqual(['COMPLETED', 'CANCELLED']);
+  });
 
-    const c = await createAction(ticket.ticketNumber);
-    const started = await request(app).patch(statusOf(c.body.id)).set('Cookie', staffCookie)
-      .send({ status: 'IN_PROGRESS', expectedUpdatedAt: c.body.updatedAt });
+  it('API-10: illegal moves between open states are 409 INVALID_ACTION_TRANSITION', async () => {
+    const ticket = await createTicket(prisma, fx);
+    const statusOf = (id: number) => `${actionsUrl(ticket.ticketNumber)}/${id}/status`;
+
+    const planned = await createAction(ticket.ticketNumber);
+    const samePlanned = await request(app).patch(statusOf(planned.body.id)).set('Cookie', staffCookie)
+      .send({ status: 'PLANNED', expectedUpdatedAt: planned.body.updatedAt });
+    expect(samePlanned.status).toBe(409);
+    expect(samePlanned.body.error).toBe('INVALID_ACTION_TRANSITION');
+
+    const started = await request(app).patch(statusOf(planned.body.id)).set('Cookie', staffCookie)
+      .send({ status: 'IN_PROGRESS', expectedUpdatedAt: planned.body.updatedAt });
     expect(started.status).toBe(200);
-    const again = await request(app).patch(statusOf(c.body.id)).set('Cookie', staffCookie)
-      .send({ status: 'IN_PROGRESS', expectedUpdatedAt: started.body.updatedAt });
-    expect(again.status).toBe(409);
-    expect(again.body.error).toBe('INVALID_ACTION_TRANSITION');
+    for (const status of ['IN_PROGRESS', 'PLANNED']) {
+      const res = await request(app).patch(statusOf(planned.body.id)).set('Cookie', staffCookie)
+        .send({ status, expectedUpdatedAt: started.body.updatedAt });
+      expect(res.status, `IN_PROGRESS -> ${status}`).toBe(409);
+      expect(res.body.error).toBe('INVALID_ACTION_TRANSITION');
+    }
 
-    const toPlanned = await request(app).patch(statusOf(c.body.id)).set('Cookie', staffCookie)
-      .send({ status: 'PLANNED', expectedUpdatedAt: started.body.updatedAt });
-    expect(toPlanned.status).toBe(409);
-
-    const bogus = await request(app).patch(statusOf(c.body.id)).set('Cookie', staffCookie)
+    const bogus = await request(app).patch(statusOf(planned.body.id)).set('Cookie', staffCookie)
       .send({ status: 'DONE', expectedUpdatedAt: started.body.updatedAt });
     expect(bogus.status).toBe(400);
   });
@@ -330,17 +345,19 @@ describe('PATCH /api/staff/tickets/:ticketNumber/actions/:actionId', () => {
 
   it('API-12: the same clientRequestId twice (sequential and parallel) creates exactly one row', async () => {
     const ticket = await createTicket(prisma, fx);
-    const clientRequestId = randomUUID();
-    const first = await createAction(ticket.ticketNumber, { clientRequestId });
-    const replay = await createAction(ticket.ticketNumber, { clientRequestId });
+    // A retry re-sends exactly the same body, so build it once.
+    const body = actionBody({ clientRequestId: randomUUID() });
+    const send = (b = body, t = ticket.ticketNumber) =>
+      request(app).post(actionsUrl(t)).set('Cookie', staffCookie).send(b);
+
+    const first = await send();
+    const replay = await send();
     expect(first.status).toBe(201);
     expect(replay.status).toBe(200);
-    expect(replay.body.id).toBe(first.body.id);
+    expect(replay.body).toEqual(first.body);
 
-    const parallelId = randomUUID();
-    const results = await Promise.all(
-      Array.from({ length: 4 }, () => createAction(ticket.ticketNumber, { clientRequestId: parallelId }))
-    );
+    const parallelBody = actionBody({ clientRequestId: randomUUID() });
+    const results = await Promise.all(Array.from({ length: 4 }, () => send(parallelBody)));
     const statuses = results.map((r) => r.status).sort();
     expect(statuses.filter((s) => s === 201)).toHaveLength(1);
     expect(statuses.every((s) => s === 200 || s === 201)).toBe(true);
@@ -349,9 +366,49 @@ describe('PATCH /api/staff/tickets/:ticketNumber/actions/:actionId', () => {
 
     // The same key on another Ticket is a different action.
     const other = await createTicket(prisma, fx);
-    const elsewhere = await createAction(other.ticketNumber, { clientRequestId });
+    const elsewhere = await send(body, other.ticketNumber);
     expect(elsewhere.status).toBe(201);
     expect(elsewhere.body.id).not.toBe(first.body.id);
+  });
+
+  it('API-12: the same clientRequestId with a different payload is 409 IDEMPOTENCY_KEY_REUSED with the original', async () => {
+    const ticket = await createTicket(prisma, fx);
+    const body = actionBody({
+      clientRequestId: randomUUID(),
+      result: 'Partially fixed',
+      followUpRequired: true,
+      followUpNote: 'Check again on Friday.',
+      attachmentNotes: 'wifi-error.png',
+    });
+    const first = await request(app).post(actionsUrl(ticket.ticketNumber)).set('Cookie', staffCookie).send(body);
+    expect(first.status).toBe(201);
+
+    const changes: Record<string, unknown> = {
+      actionAt: new Date(new Date(body.actionAt as string).getTime() - 60_000).toISOString(),
+      description: 'A different description',
+      result: 'Different result',
+      followUpRequired: false,
+      followUpNote: 'A different note',
+      attachmentNotes: 'other-file.png',
+      performedById: fx.staffB.id,
+    };
+    for (const [field, value] of Object.entries(changes)) {
+      const res = await request(app).post(actionsUrl(ticket.ticketNumber)).set('Cookie', staffCookie)
+        .send({ ...body, [field]: value });
+      expect(res.status, field).toBe(409);
+      expect(res.body.error, field).toBe('IDEMPOTENCY_KEY_REUSED');
+      expect(res.body.current, field).toEqual(first.body);
+    }
+
+    // Formatting-only differences are the same payload (trimmed text, same instant).
+    const sameMeaning = await request(app).post(actionsUrl(ticket.ticketNumber)).set('Cookie', staffCookie)
+      .send({ ...body, description: `  ${body.description}  `, performedById: fx.staffA.id });
+    expect(sameMeaning.status).toBe(200);
+    expect(sameMeaning.body).toEqual(first.body);
+
+    const row = await prisma.actionTaken.findUniqueOrThrow({ where: { id: first.body.id } });
+    expect(row.updatedAt.toISOString()).toBe(first.body.updatedAt);
+    expect(await prisma.actionTaken.count({ where: { ticketId: ticket.id } })).toBe(1);
   });
 
   it('API-13: refuses to create or edit Actions Taken on a RESOLVED, CLOSED, or CANCELLED Ticket', async () => {

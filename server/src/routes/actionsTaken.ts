@@ -60,6 +60,13 @@ async function isValidAssignee(userId: number) {
   return user !== null;
 }
 
+function actionLocked(res: Response) {
+  return res.status(409).json({
+    error: 'ACTION_LOCKED',
+    message: 'Completed and cancelled actions cannot be changed. Record a new action instead.',
+  });
+}
+
 function invalidAssignee(res: Response) {
   return res.status(422).json({
     error: 'INVALID_ASSIGNEE',
@@ -95,6 +102,38 @@ async function updateIfUnchanged(actionId: number, expected: Date, data: Prisma.
     data: { ...data, updatedAt: new Date(Math.max(Date.now(), expected.getTime() + 1)) },
   });
   return count === 1;
+}
+
+type ActionTakenRow = NonNullable<Awaited<ReturnType<typeof findAction>>>;
+
+/**
+ * BR-18: a replay must carry the same payload as the request that created the
+ * row. Compared on the validated (trimmed, normalised) values, so formatting
+ * differences such as surrounding spaces do not count as a different payload.
+ */
+function samePayload(
+  row: ActionTakenRow,
+  data: ReturnType<typeof validateActionFields>['data'],
+  performedById: number
+) {
+  return (
+    row.actionAt.getTime() === data.actionAt!.getTime() &&
+    row.description === data.description &&
+    row.result === (data.result ?? null) &&
+    row.followUpRequired === (data.followUpRequired ?? false) &&
+    row.followUpNote === (data.followUpNote ?? null) &&
+    row.attachmentNotes === (data.attachmentNotes ?? null) &&
+    row.performedById === performedById
+  );
+}
+
+function replayResponse(res: Response, row: ActionTakenRow, matches: boolean) {
+  if (matches) return res.status(200).json(toActionTaken(row));
+  return res.status(409).json({
+    error: 'IDEMPOTENCY_KEY_REUSED',
+    message: 'This request key was already used for a different action.',
+    current: toActionTaken(row),
+  });
 }
 
 function bodyOf(req: Request): Record<string, unknown> {
@@ -143,13 +182,14 @@ router.post('/staff/tickets/:ticketNumber/actions', ...staffOnly, async (req: Re
           })
         : Promise.resolve(null);
 
-    // BR-18: a retry of an already-processed request returns the original action.
+    const performedById = typeof body.performedById === 'number' ? body.performedById : req.user!.id;
+
+    // BR-18: a retry of an already-processed request returns the original
+    // action; the same key with a different payload is refused.
     const replay = await findReplay();
-    if (replay) return res.status(200).json(toActionTaken(replay));
+    if (replay) return replayResponse(res, replay, samePayload(replay, data, performedById));
 
     if (!isActiveTicketStatus(ticket.currentStatus as TicketStatus)) return ticketNotActive(res);
-
-    const performedById = typeof body.performedById === 'number' ? body.performedById : req.user!.id;
     if (!(await isValidAssignee(performedById))) return invalidAssignee(res);
 
     try {
@@ -175,7 +215,7 @@ router.post('/staff/tickets/:ticketNumber/actions', ...staffOnly, async (req: Re
       // one insert through; the other returns the row that won (BR-18).
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         const winner = await findReplay();
-        if (winner) return res.status(200).json(toActionTaken(winner));
+        if (winner) return replayResponse(res, winner, samePayload(winner, data, performedById));
       }
       throw error;
     }
@@ -205,12 +245,7 @@ router.patch('/staff/tickets/:ticketNumber/actions/:actionId', ...staffOnly, asy
     const expected = readExpectedUpdatedAt(body, fields);
     if (Object.keys(fields).length > 0 || !expected) return validationError(res, fields);
 
-    if (isLockedActionStatus(action.status as ActionStatus)) {
-      return res.status(409).json({
-        error: 'ACTION_LOCKED',
-        message: 'Completed and cancelled actions cannot be changed. Record a new action instead.',
-      });
-    }
+    if (isLockedActionStatus(action.status as ActionStatus)) return actionLocked(res);
     if (!isActiveTicketStatus(ticket.currentStatus as TicketStatus)) return ticketNotActive(res);
     if (expected.getTime() !== action.updatedAt.getTime()) return staleUpdate(res, action.id);
 
@@ -256,6 +291,9 @@ router.patch('/staff/tickets/:ticketNumber/actions/:actionId/status', ...staffOn
     const expected = readExpectedUpdatedAt(body, fields);
     if (Object.keys(fields).length > 0 || !expected) return validationError(res, fields);
 
+    // A completed or cancelled action is immutable (BR-09), checked before the
+    // transition rule, which then only covers moves between open states.
+    if (isLockedActionStatus(action.status as ActionStatus)) return actionLocked(res);
     if (!isActiveTicketStatus(ticket.currentStatus as TicketStatus)) return ticketNotActive(res);
     if (expected.getTime() !== action.updatedAt.getTime()) return staleUpdate(res, action.id);
 
