@@ -1,5 +1,6 @@
-// prisma/schema.prisma — Lab 3 final state
-// Extends Lab 2: RequesterUser is renamed/generalized to User with a role.
+// prisma/schema.prisma — Lab 4 state
+// Extends Lab 3 (User with a role) with Actions Taken and Status History
+// (docs/lab-04/specification.md sec 7).
 
 generator client {
   provider = "prisma-client-js"
@@ -33,6 +34,13 @@ enum TicketStatus {
   CANCELLED
 }
 
+enum ActionStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
 model User {
   id                 Int      @id @default(autoincrement())
   name               String
@@ -48,6 +56,9 @@ model User {
   ticketsOwned     Ticket[]             @relation("TicketOwner")
   comments         TicketComment[]
   notes            TicketInternalNote[]
+  actionsPerformed ActionTaken[]        @relation("ActionPerformedBy")
+  actionsCreated   ActionTaken[]        @relation("ActionCreatedBy")
+  statusChanges    TicketStatusChange[]
 
   @@index([role])
 }
@@ -85,17 +96,22 @@ model Ticket {
   itPriority                 Priority?
   currentStatus              TicketStatus         @default(NEW)
   requesterIndicatedResolved Boolean              @default(false)
+  resolvedAt                 DateTime?
   createdAt                  DateTime             @default(now())
   updatedAt                  DateTime             @updatedAt
   attachments                Attachment[]
   publicComments             TicketComment[]
   internalNotes              TicketInternalNote[]
+  actionsTaken               ActionTaken[]
+  statusChanges              TicketStatusChange[]
 
   @@index([requesterId])
   @@index([ticketOwnerId])
   @@index([categoryId])
   @@index([currentStatus])
   @@index([createdAt])
+  @@index([currentStatus, ticketOwnerId])
+  @@index([requesterId, currentStatus])
 }
 
 model TicketComment {
@@ -136,6 +152,45 @@ model Attachment {
   removalReason    String?
 
   @@index([ticketId])
+}
+
+model ActionTaken {
+  id               Int          @id @default(autoincrement())
+  ticketId         Int
+  ticket           Ticket       @relation(fields: [ticketId], references: [id])
+  actionAt         DateTime // Action Date/Time (BR-06)
+  description      String // 1-2000
+  result           String? // required to complete (BR-07)
+  status           ActionStatus @default(PLANNED)
+  performedById    Int // "Performed by" (auto = creator, re-assignable, BR-05)
+  performedBy      User         @relation("ActionPerformedBy", fields: [performedById], references: [id])
+  createdById      Int // "Created by" (session, immutable, BR-04)
+  createdBy        User         @relation("ActionCreatedBy", fields: [createdById], references: [id])
+  followUpRequired Boolean      @default(false)
+  followUpNote     String? // required iff followUpRequired
+  attachmentNotes  String? // <= 500, text reference
+  clientRequestId  String? // idempotency key (BR-18)
+  completedAt      DateTime?
+  cancelledAt      DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@unique([ticketId, clientRequestId])
+  @@index([ticketId, actionAt, id])
+  @@index([performedById, status])
+}
+
+model TicketStatusChange {
+  id          Int          @id @default(autoincrement())
+  ticketId    Int
+  ticket      Ticket       @relation(fields: [ticketId], references: [id])
+  fromStatus  TicketStatus
+  toStatus    TicketStatus
+  changedById Int
+  changedBy   User         @relation(fields: [changedById], references: [id])
+  changedAt   DateTime     @default(now())
+
+  @@index([ticketId, changedAt, id])
 }
 
 model TicketSequence {
