@@ -6,6 +6,7 @@ import path from 'node:path';
 import { PrismaClient } from '@prisma/client';
 import app from '../../src/app';
 import { backfillResolvedAt, RESOLVED_AT_BACKFILL_SQL } from '../../src/utils/resolvedAtBackfill';
+import { OPEN_ACTION_STATUSES } from '../../src/utils/actionTransition';
 import { createFixture, cleanupPrefix, createTicket, loginAs } from './fixtures';
 import type { Lab4Fixture } from './fixtures';
 import {
@@ -168,7 +169,7 @@ describe('Lab 4 migration', () => {
     expect(lab4.length).toBeGreaterThanOrEqual(6);
     // BR-10/BR-13 invariant: no seed ticket in an inactive status has an open action.
     const openOnInactive = await prisma.actionTaken.count({
-      where: { status: { in: ['PLANNED', 'IN_PROGRESS'] }, ticket: { ...seedTickets, currentStatus: { in: ['RESOLVED', 'CLOSED', 'CANCELLED'] } } },
+      where: { status: { in: [...OPEN_ACTION_STATUSES] }, ticket: { ...seedTickets, currentStatus: { in: ['RESOLVED', 'CLOSED', 'CANCELLED'] } } },
     });
     expect(openOnInactive).toBe(0);
     // Not trivially true: some inactive seed tickets do carry (finished) actions.

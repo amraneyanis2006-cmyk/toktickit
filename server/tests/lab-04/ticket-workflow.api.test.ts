@@ -623,6 +623,10 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
   });
 
   it('WF-09: cancelling a Ticket also cancels its open Actions Taken in the same change; finished actions are untouched', async () => {
+    // A neighbour ticket with open actions must not be touched (BR-13 "its" open actions).
+    const neighbour = await createTicket(prisma, fx);
+    const nPlanned = await addAction(neighbour.id, 'PLANNED');
+    const nStarted = await addAction(neighbour.id, 'IN_PROGRESS');
     const ticket = await createTicket(prisma, fx);
     const planned = await addAction(ticket.id, 'PLANNED', 90);
     const started = await addAction(ticket.id, 'IN_PROGRESS', 60);
@@ -648,8 +652,12 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
     for (const from of ['NEW', 'OPEN', 'WAITING_FOR_REQUESTER', 'REOPENED'] as const) {
       const t = await createTicket(prisma, fx, { status: from });
       const a = await addAction(t.id, 'PLANNED');
-      expect((await changeStatus(t.ticketNumber, { currentStatus: 'CANCELLED' })).status, from).toBe(200);
-      expect((await prisma.actionTaken.findUniqueOrThrow({ where: { id: a.id } })).status, from).toBe('CANCELLED');
+      const cancelled = await changeStatus(t.ticketNumber, { currentStatus: 'CANCELLED' });
+      expect(cancelled.status, from).toBe(200);
+      const after = await prisma.actionTaken.findUniqueOrThrow({ where: { id: a.id } });
+      expect(after.status, from).toBe('CANCELLED');
+      expect(after.cancelledAt!.toISOString(), from).toBe(cancelled.body.statusChange.changedAt);
+      expect(await historyCount(t.id), from).toBe(1);
     }
 
     // The serialized detail shows the cascade (staff and Requester).
@@ -673,6 +681,13 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
     expect((await prisma.actionTaken.findUniqueOrThrow({ where: { id: planned.id } })).updatedAt.toISOString()).toBe(res.body.statusChange.changedAt);
     expect(await prisma.actionTaken.count({ where: { ticketId: ticket.id, status: { in: ['PLANNED', 'IN_PROGRESS'] } } })).toBe(0);
     expect(await historyCount(ticket.id)).toBe(1);
+    for (const n of [nPlanned, nStarted]) {
+      expect(await prisma.actionTaken.findUniqueOrThrow({ where: { id: n.id } })).toMatchObject({
+        status: n.status,
+        updatedAt: n.updatedAt,
+        cancelledAt: null,
+      });
+    }
 
     // Other transitions never touch actions (a representative walk through non-cancel moves).
     const other = await createTicket(prisma, fx, { status: 'NEW' });
@@ -705,6 +720,7 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
       const res = await changeStatus(ticket.ticketNumber, { currentStatus: 'CANCELLED' });
       expect(res.status).toBe(500);
       expect(res.body).toEqual({ error: 'INTERNAL_ERROR', message: expect.any(String) });
+      expect(JSON.stringify(res.body)).not.toMatch(/injected failure|TicketStatusChange|plpgsql|at \S+\.ts/);
     } finally {
       await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS ${fn} ON "TicketStatusChange"`);
       await prisma.$executeRawUnsafe(`DROP FUNCTION IF EXISTS ${fn}()`);
@@ -714,6 +730,20 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
     expect(row.updatedAt.toISOString()).toBe(ticket.updatedAt.toISOString());
     expect(await prisma.actionTaken.findUniqueOrThrow({ where: { id: open.id } })).toMatchObject({
       status: 'IN_PROGRESS',
+      updatedAt: open.updatedAt,
+      cancelledAt: null,
+    });
+    expect(await historyCount(ticket.id)).toBe(0);
+  });
+
+  it('WF-09: a cancel refused with STALE_UPDATE leaves the open actions untouched', async () => {
+    const ticket = await createTicket(prisma, fx);
+    const open = await addAction(ticket.id, 'PLANNED');
+    const res = await changeStatus(ticket.ticketNumber, { currentStatus: 'CANCELLED', expectedUpdatedAt: '2020-01-01T00:00:00.000Z' });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('STALE_UPDATE');
+    expect(await prisma.actionTaken.findUniqueOrThrow({ where: { id: open.id } })).toMatchObject({
+      status: 'PLANNED',
       updatedAt: open.updatedAt,
       cancelledAt: null,
     });

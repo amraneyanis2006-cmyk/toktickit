@@ -123,7 +123,7 @@ an empty key (Lab 3 AC-09). Another Requester's Ticket → `404 NOT_FOUND`.
 ## 5. PATCH /api/staff/tickets/:ticketNumber/actions/:actionId 🔒S
 
 Edit and/or assign an **open** Action Taken. Partial update: only supplied fields
-change. Check order after validation: `TICKET_NOT_ACTIVE` (BR-10, also for actions a
+change. Check order: validation (400) → ticket/action (404) → `TICKET_NOT_ACTIVE` (BR-10, also for actions a
 ticket cancel has cancelled) → `ACTION_LOCKED` → `STALE_UPDATE` → `INVALID_ASSIGNEE`;
 the ticket row is share-locked before the action row is written (§8).
 - **Request**
@@ -144,7 +144,8 @@ the ticket row is share-locked before the action row is written (§8).
 - **404 `NOT_FOUND`** unknown ticket, or action not belonging to that ticket.
 - **409 `STALE_UPDATE`** `expectedUpdatedAt` ≠ stored `updatedAt`; body includes
   `"current": ActionTaken` so the client can refresh (BR-17).
-- **409 `ACTION_LOCKED`** action is COMPLETED or CANCELLED (BR-09) - active ticket only; on an inactive ticket `TICKET_NOT_ACTIVE` is answered instead.
+- **409 `ACTION_LOCKED`** action is COMPLETED or CANCELLED (BR-09) - active ticket only;
+  on an inactive ticket `TICKET_NOT_ACTIVE` is answered instead.
 - **409 `TICKET_NOT_ACTIVE`** (BR-10; re-checked on the share-locked ticket row, §8).
 - **422 `INVALID_ASSIGNEE`** (BR-05).
 
@@ -161,7 +162,8 @@ last because it depends on the stored Result).
 - **400 `VALIDATION_ERROR`** invalid `status` value; `fields.result` when completing
   without a Result; `expectedUpdatedAt` missing.
 - **409 `ACTION_LOCKED`** the action is COMPLETED or CANCELLED (checked before the
-  transition rule, BR-09) - active ticket only; on an inactive ticket `TICKET_NOT_ACTIVE` is answered instead.
+  transition rule, BR-09) - active ticket only; on an inactive ticket
+  `TICKET_NOT_ACTIVE` is answered instead.
 - **409 `INVALID_ACTION_TRANSITION`** a move between open states not allowed by BR-08
   (e.g. IN_PROGRESS → PLANNED, PLANNED → PLANNED).
 - **409 `STALE_UPDATE`** (with `current`), **409 `TICKET_NOT_ACTIVE`** (re-checked on the
