@@ -32,3 +32,16 @@ export function isValidTransition(from: TicketStatus, to: TicketStatus): boolean
 export function legalNextStatuses(from: TicketStatus): TicketStatus[] {
   return TRANSITIONS[from] ?? [];
 }
+
+/** Active statuses (Lab 4 BR-10, BR-22): Actions Taken can be recorded only while a Ticket is in one of these. */
+export const ACTIVE_TICKET_STATUSES: readonly TicketStatus[] = [
+  'NEW',
+  'OPEN',
+  'IN_PROGRESS',
+  'WAITING_FOR_REQUESTER',
+  'REOPENED',
+];
+
+export function isActiveTicketStatus(status: TicketStatus): boolean {
+  return ACTIVE_TICKET_STATUSES.includes(status);
+}

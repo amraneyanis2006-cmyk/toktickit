@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import { requireAuth, requirePasswordChanged, requireRole } from '../middleware/auth';
 import { generateTicketNumber } from '../utils/ticketNumber';
 import { validateTicketFields, normalizePagination, validateCommentContent } from '../utils/validation';
+import { TICKET_HISTORY_INCLUDE, toActionTaken, toStatusChange } from '../utils/ticketHistory';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -239,6 +240,9 @@ router.get('/tickets/:ticketNumber', requireAuth, requirePasswordChanged, requir
           orderBy: { createdAt: 'asc' },
           include: { author: { select: { id: true, name: true, role: true } } },
         },
+        // Lab 4 BR-20: a Requester reads Actions Taken and Status History of
+        // their own Ticket (never Internal Notes - not included at all).
+        ...TICKET_HISTORY_INCLUDE,
       },
     });
 
@@ -263,6 +267,7 @@ router.get('/tickets/:ticketNumber', requireAuth, requirePasswordChanged, requir
       itPriority: ticket.itPriority,
       currentStatus: ticket.currentStatus,
       requesterIndicatedResolved: ticket.requesterIndicatedResolved,
+      resolvedAt: ticket.resolvedAt,
       createdAt: ticket.createdAt,
       updatedAt: ticket.updatedAt,
       attachments: ticket.attachments.map(a => ({
@@ -286,6 +291,8 @@ router.get('/tickets/:ticketNumber', requireAuth, requirePasswordChanged, requir
         content: c.content,
         createdAt: c.createdAt,
       })),
+      actionsTaken: ticket.actionsTaken.map(toActionTaken),
+      statusHistory: ticket.statusChanges.map(toStatusChange),
     });
 
   } catch (error) {

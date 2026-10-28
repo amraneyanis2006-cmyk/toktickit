@@ -35,9 +35,9 @@ Planned before implementation (Spec DD → Test DD → TDD). Every AC in
 | API-07 | API | FR-03, FR-04 | Edit and re-assign an open action | 200; only supplied fields change; updatedAt changes | server/tests/lab-04/actions-taken.api.test.ts | Planned |
 | API-08 | API | AC-06 | Complete without / with Result, then edit | 400 `fields.result`; then 200 COMPLETED with completedAt; later PATCH → 409 ACTION_LOCKED | server/tests/lab-04/actions-taken.api.test.ts | Planned |
 | API-09 | API | AC-07 | Cancel an action | 200 CANCELLED with cancelledAt; still returned by the list; edit → 409 ACTION_LOCKED | server/tests/lab-04/actions-taken.api.test.ts | Planned |
-| API-10 | API | BR-08 | Illegal action transitions | 409 INVALID_ACTION_TRANSITION (e.g. COMPLETED→IN_PROGRESS, CANCELLED→COMPLETED) | server/tests/lab-04/actions-taken.api.test.ts | Planned |
+| API-10 | API | BR-08, BR-09 | Status changes on terminal actions and illegal open-state moves | COMPLETED/CANCELLED → any status: 409 ACTION_LOCKED (checked first); IN_PROGRESS→PLANNED, IN_PROGRESS→IN_PROGRESS, PLANNED→PLANNED: 409 INVALID_ACTION_TRANSITION; unknown status: 400 | server/tests/lab-04/actions-taken.api.test.ts | Planned |
 | API-11 | API | AC-11, BR-17 | Stale `expectedUpdatedAt` | 409 STALE_UPDATE with `current`; first user's change kept; missing token → 400 | server/tests/lab-04/actions-taken.api.test.ts | Planned |
-| API-12 | API | AC-13, BR-18 | Same `clientRequestId` twice (sequential and parallel) | One row; second call 200 with the same id | server/tests/lab-04/actions-taken.api.test.ts | Planned |
+| API-12 | API | AC-13, BR-18 | Same `clientRequestId` twice (sequential and parallel); same key with a different payload | One row; same payload → 200 with the original, unchanged; different `actionAt`/`description`/`result`/`followUpRequired`/`followUpNote`/`attachmentNotes`/`performedById` → 409 IDEMPOTENCY_KEY_REUSED with `current`, nothing saved | server/tests/lab-04/actions-taken.api.test.ts | Planned |
 | API-13 | API | BR-10 | Create/edit on RESOLVED, CLOSED, CANCELLED Ticket | 409 TICKET_NOT_ACTIVE | server/tests/lab-04/actions-taken.api.test.ts | Planned |
 | API-14 | API | AC-15, BR-09 | Append-only | DELETE on action → 404 (no route); count unchanged; order stable after an edit | server/tests/lab-04/actions-taken.api.test.ts | Planned |
 
@@ -193,7 +193,9 @@ npx tsx scripts/lab4-metrics-check.ts > artifacts/lab-04/metrics-check.txt
 **Server test timeout:** from Issue #61 the server Vitest config sets
 `testTimeout: 15000` (config only, no test edited). The bcrypt cost-12 Lab 3 API tests
 (e.g. `users-admin.api.test.ts` reset-password, about 5.1 s) exceed the 5 s default on a
-loaded machine.
+loaded machine. It also sets `fileParallelism: false` (PR #69 review): the server
+files share one dev database and CPU-bound bcrypt, so they run one file at a time and
+`npx vitest run` is deterministic.
 
 ## 14. Final Results
 
