@@ -166,10 +166,16 @@ Response shape unchanged (`data`, `pagination.totalItems`), which is what the
 drill-down equality test compares with the dashboard value (BR-26).
 
 ### 7.3 GET /api/admin/users 🔒A
-Unchanged API; the UI now initialises its existing `role` filter from the URL
-(`/admin/users?role=IT_STAFF`). The `userAccounts` drill-down also passes
-`status=active|inactive`, applied by the existing filter logic or added as
-`isActive=true|false` (additive).
+The Lab 3 endpoint supports only `search` and `role` and returns a plain array (no
+`pagination`, Lab 3 api-spec §14). Lab 4 adds one optional, additive parameter:
+
+| Param | Values | Meaning |
+|---|---|---|
+| `isActive` | `true\|false` | `isActive = value` |
+
+The UI initialises its `role` and `isActive` filters from the URL
+(`/admin/users?role=IT_STAFF&isActive=true`). For this list the drill-down equality
+(BR-26) compares the card value with the length of the returned array.
 
 ## 8. PATCH /api/staff/tickets/:ticketNumber/status 🔒S (changed)
 

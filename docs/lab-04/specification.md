@@ -187,7 +187,7 @@ change the status (they can only set the advisory indication, BR-14).
 | `myOpenActionsList` (list) | Staff | same filter as `myOpenActions`, oldest `actionAt` first, max 5, with ticketNumber | `/staff/tickets/:ticketNumber` |
 | `urgentTickets` (list) | Staff | currentStatus ∈ active AND itPriority = HIGH, oldest `createdAt` first, max 5 | `/staff/tickets/:ticketNumber` |
 | `recentTickets` (list) | Staff | all Tickets, `updatedAt` desc then ticketNumber desc, max 5 | `/staff/tickets/:ticketNumber` |
-| `userAccounts` | Admin only | User counts: active ∧ role = REQUESTER / IT_STAFF / ADMINISTRATOR; `inactive` = isActive = false | `/admin/users?role=<ROLE>` |
+| `userAccounts` | Admin only | User counts: active ∧ role = REQUESTER / IT_STAFF / ADMINISTRATOR; `inactive` = isActive = false | `/admin/users?role=<ROLE>&isActive=true`; `inactive` → `/admin/users?isActive=false` |
 
 ## 6. UI Specification Summary
 
@@ -299,7 +299,7 @@ model TicketStatusChange {
    by the workflow and checked by the transition function (BR-08).
 
 ### 7.1 Migration, Backfill, and Recovery
-Migration `prisma/migrations/2026102800000X_lab4_actions_taken/` is **additive only**:
+Migration `prisma/migrations/20261028000001_lab4_actions_taken/` is **additive only**:
 1. Create enum `ActionStatus`, tables `ActionTaken` and `TicketStatusChange`,
    column `Ticket.resolvedAt` (nullable), and the new indexes.
 2. **Backfill:** `UPDATE "Ticket" SET "resolvedAt" = "updatedAt" WHERE "currentStatus"
@@ -342,7 +342,7 @@ Exact shapes in `docs/lab-04/api-spec.md`. New or changed endpoints:
 
 | Method & Path | Purpose | Roles |
 |---|---|---|
-| `GET /api/staff/tickets/:ticketNumber` | (changed) also returns `actionsTaken`, `statusHistory`, `resolvedAt`, `resolutionGate` | IT Staff, Admin |
+| `GET /api/staff/tickets/:ticketNumber` | (changed) also returns `actionsTaken`, `statusHistory`, `resolvedAt`, `resolutionGate`, `legalNextStatuses` | IT Staff, Admin |
 | `GET /api/tickets/:ticketNumber` | (changed) also returns read-only `actionsTaken`, `statusHistory`, `resolvedAt` | Requester (owner) |
 | `GET /api/staff/tickets/:ticketNumber/actions` | List Actions Taken | IT Staff, Admin |
 | `POST /api/staff/tickets/:ticketNumber/actions` | Create an Action Taken (idempotent) | IT Staff, Admin |
@@ -350,7 +350,7 @@ Exact shapes in `docs/lab-04/api-spec.md`. New or changed endpoints:
 | `PATCH /api/staff/tickets/:ticketNumber/actions/:actionId/status` | Start / complete / cancel | IT Staff, Admin |
 | `PATCH /api/staff/tickets/:ticketNumber/status` | (changed) resolution gate, stale check, history, `resolvedAt` | IT Staff, Admin |
 | `GET /api/staff/tickets`, `GET /api/tickets` | (changed, additive) comma-separated `status`, plus drill-down filters | as Lab 3 |
-| `GET /api/admin/users` | (unchanged API) `role` filter used by drill-down | Admin |
+| `GET /api/admin/users` | (changed, additive) `isActive` filter; existing `role` filter used by drill-down | Admin |
 | `GET /api/dashboard/requester` | Requester dashboard | Requester |
 | `GET /api/dashboard/staff` | IT Staff dashboard (+ `userAccounts` for Admin) | IT Staff, Admin |
 | `GET /api/health` | (changed) `{ status, database }` | Public |

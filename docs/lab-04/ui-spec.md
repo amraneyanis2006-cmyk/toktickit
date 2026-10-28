@@ -15,6 +15,8 @@ visual system is introduced; everything below is built from the existing classes
 :root {
   --zg-info-bg: #E7F0FA;   /* already used by Status OPEN / Role IT Staff */
   --zg-info-text: #1F5F9C;
+  --zg-neutral-bg: #E8ECE9;   /* already used by Status CLOSED */
+  --zg-neutral-text: #4C5C54;
 }
 ```
 | Badge (class) | Background | Text | Label (always shown) |
@@ -50,7 +52,7 @@ color alone (text label + icon where useful).
 - **Page header:** `h1` greeting ("Welcome back, {first name}") + one-line subtitle,
   and a **Refresh** button (`btn-zg-secondary`, busy-disabled while loading,
   `aria-label="Refresh dashboard"`), plus "Updated at hh:mm" from `generatedAt`.
-- **MetricCard** (`zg-card zg-metric`): label (`h2`, 14 px, muted), value (32 px,
+- **MetricCard** (`zg-card zg-metric`, `zg-metric` being a new modifier class): label (`h2`, 14 px, muted), value (32 px,
   weight 600, `aria-live="polite"` on refresh), and a **"View all"** link whose
   accessible name includes the metric ("View all open tickets"). The whole card is
   **not** a click target (avoids nested interactive elements); the link is.
@@ -97,7 +99,7 @@ color alone (text label + icon where useful).
 
 **Drill-down targets must honour the URL:** My Tickets, Ticket Queue, and User
 Management read their filter state (status list, ownership, priority,
-requesterResolved, resolvedWithinDays, role) from the query string on load, show the
+requesterResolved, resolvedWithinDays, role, isActive) from the query string on load, show the
 applied filters in their controls, and display a removable "Filtered from
 Dashboard" chip. Clear Filters removes them.
 
