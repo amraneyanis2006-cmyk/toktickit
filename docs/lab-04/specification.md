@@ -121,7 +121,7 @@ final demonstration.
 | BR-05 | **Performed by** ("auto") defaults to the creator. It may be re-assigned only to an **active** user whose role is IT Staff or Administrator; any other value is rejected with `422 INVALID_ASSIGNEE` and nothing is saved. |
 | BR-06 | **Action Date/Time** is required (the form pre-fills "now"); it must not be earlier than the Ticket's creation time (compared at minute precision, the resolution of the form's `datetime-local` value) nor later than the server time + 5 minutes; it is sent as ISO-8601 with a time zone. Stored in UTC, displayed in the viewer's local time zone. |
 | BR-07 | Field rules (trimmed): Action Description required, 1–2000 characters. Result optional while the action is open, **required (1–2000) to complete it**. Follow-up Note **required (1–1000) when Follow-Up Required is true**, and stored as `null` when it is false. Attachment Notes optional, ≤ 500 characters, plain text describing which file to look at (e.g. an attachment file name); it is not an upload. |
-| BR-08 | Action Taken status transitions: PLANNED → IN_PROGRESS, COMPLETED, CANCELLED; IN_PROGRESS → COMPLETED, CANCELLED; COMPLETED and CANCELLED are terminal. Anything else → `409 INVALID_ACTION_TRANSITION`. Completing sets `completedAt`; cancelling sets `cancelledAt`. |
+| BR-08 | Action Taken status transitions: PLANNED → IN_PROGRESS, COMPLETED, CANCELLED; IN_PROGRESS → COMPLETED, CANCELLED; COMPLETED and CANCELLED are terminal: any status change on them → `409 ACTION_LOCKED` (checked first, BR-09). Any other move not listed (between open states, e.g. IN_PROGRESS → PLANNED, PLANNED → PLANNED) → `409 INVALID_ACTION_TRANSITION`. Completing sets `completedAt`; cancelling sets `cancelledAt`. |
 | BR-09 | **Append-only:** Actions Taken are never deleted (no DELETE endpoint). A COMPLETED or CANCELLED Action Taken is immutable (`409 ACTION_LOCKED`); a correction is recorded as a new Action Taken. Public Comments, Internal Notes, and Status History entries are also append-only. |
 | BR-10 | Actions Taken can be created or edited only while the Ticket is active (NEW, OPEN, IN_PROGRESS, WAITING_FOR_REQUESTER, REOPENED); otherwise `409 TICKET_NOT_ACTIVE`. To work on a Resolved or Closed Ticket, IT Staff reopen it first. |
 
@@ -152,7 +152,7 @@ change the status (they can only set the advisory indication, BR-14).
 | BR-15 | Entering RESOLVED sets `resolvedAt = now()`; entering REOPENED clears `resolvedAt`; CLOSED keeps it. |
 | BR-16 | Every successful status change writes exactly one `TicketStatusChange` row (from, to, changed by, changed at) in the **same database transaction** as the status update. These rows are never updated or deleted. |
 | BR-17 | **Stale updates.** Every Action Taken update must send `expectedUpdatedAt`; if the stored `updatedAt` differs, the update is rejected with `409 STALE_UPDATE` and the current record. The Ticket status endpoint accepts `expectedUpdatedAt` (always sent by the Lab 4 UI; optional in the API for Lab 3 compatibility) with the same behavior, and performs a conditional update on the status it read, so two simultaneous transitions can never both succeed. |
-| BR-18 | **Idempotent creation.** Creating an Action Taken accepts a client-generated `clientRequestId` (UUID). A repeated request with the same Ticket and `clientRequestId` returns the original Action Taken (`200`) instead of creating a duplicate. |
+| BR-18 | **Idempotent creation.** Creating an Action Taken accepts a client-generated `clientRequestId` (UUID). A repeated request with the same Ticket, `clientRequestId` **and payload** returns the original Action Taken unchanged (`200`) instead of creating a duplicate. The same key with a different payload (any of `actionAt`, `description`, `result`, `followUpRequired`, `followUpNote`, `attachmentNotes`, `performedById`, compared after validation/trimming) → `409 IDEMPOTENCY_KEY_REUSED` with `current` (the original) and nothing is saved. |
 | BR-19 | **Stable ordering.** Actions Taken: `actionAt` ascending, then `id` ascending. Status History: `changedAt` ascending, then `id`. Public Comments and Internal Notes: `createdAt` ascending, then `id`. The same data always renders in the same order. |
 | BR-20 | **Visibility.** IT Staff and Administrators see everything on every Ticket. A Requester sees, on their own Tickets only: ticket fields, Attachments, Public Comments, Actions Taken, and Status History — never Internal Notes (Lab 3 BR-08/BR-27 unchanged). |
 
@@ -324,8 +324,12 @@ Migration `prisma/migrations/20261028000001_lab4_actions_taken/` is **additive o
 
 ### 7.2 Seed Data (idempotent)
 The existing seed is extended; every new row uses a stable key so re-running the seed
-changes nothing (Actions Taken use `clientRequestId = "seed-<ticketNumber>-<n>"`
-with upsert on `[ticketId, clientRequestId]`).
+changes nothing. Lab 4 seed tickets get normal `TKT-YYYY-NNNNNN` numbers from the
+ticket sequence (the generator used by `POST /api/tickets`); each has a stable seed key
+and at least one Action Taken with `clientRequestId = "seed-<seed key>-<n>"`, through
+which a re-run finds the ticket again. Each ticket is created together with its
+actions and Status History in one nested create. Zero-action tickets are the legacy
+seed tickets.
 - Tickets covering all 8 statuses, all IT Priorities including "not set", assigned and
   unassigned ownership.
 - Tickets with **zero**, **one**, and **multiple** (≥ 3) Actions Taken, including
@@ -360,7 +364,7 @@ Exact shapes in `docs/lab-04/api-spec.md`. New or changed endpoints:
 
 New error codes: `409 RESOLUTION_BLOCKED`, `409 STALE_UPDATE`,
 `409 INVALID_ACTION_TRANSITION`, `409 ACTION_LOCKED`, `409 TICKET_NOT_ACTIVE`,
-`422 INVALID_ASSIGNEE`. Error shape unchanged: `{ error, message, fields? }`.
+`409 IDEMPOTENCY_KEY_REUSED`, `422 INVALID_ASSIGNEE`. Error shape unchanged: `{ error, message, fields? }`.
 There is **no** DELETE endpoint for Actions Taken, Status History, Comments, or Notes.
 
 ## 9. Acceptance Criteria
@@ -442,3 +446,4 @@ into `main`, `reviewer.md` and `ai-use.md` completed, submission PDF Answer Part
      Action Taken in their fixture; their assertions are unchanged.
 8. **Administrator dashboard** reuses the IT Staff dashboard plus account counts,
    as allowed by the handout, instead of a third design.
+9. **Known Lab 3 schema drift, intentionally left untouched.** The Lab 3 hand-written migration left three `User` column defaults (`role`, `mustChangePassword`, `updatedAt`) and the `TicketComment`/`TicketInternalNote` foreign-key rules different from `schema.prisma`; fixing it would require a non-additive migration (`DROP DEFAULT`/`DROP CONSTRAINT`), so the Lab 4 migration is generated as a Lab 3 → Lab 4 schema diff and applied with `prisma migrate deploy`.

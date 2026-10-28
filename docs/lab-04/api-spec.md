@@ -97,8 +97,13 @@ an empty key (Lab 3 AC-09). Another Requester's Ticket → `404 NOT_FOUND`.
 `ticketId` are **never** read from the body (BR-01, BR-04). `status` is always
 `PLANNED` on creation.
 - **201** → `ActionTaken`.
-- **200** → the existing `ActionTaken` when the same `clientRequestId` was already
-  used on this Ticket (idempotent replay, BR-18).
+- **200** → the existing `ActionTaken`, unchanged, when the same `clientRequestId` was
+  already used on this Ticket **with the same payload** (idempotent replay, BR-18).
+- **409 `IDEMPOTENCY_KEY_REUSED`** the same `clientRequestId` was already used on this
+  Ticket with a **different** payload (any of `actionAt`, `description`, `result`,
+  `followUpRequired`, `followUpNote`, `attachmentNotes`, `performedById`, compared after
+  validation and trimming); body includes `"current": ActionTaken` (the original);
+  nothing is saved.
 - **400 `VALIDATION_ERROR`** with `fields` (all invalid fields at once):
   `actionAt` (missing, not ISO-8601 with a time zone, before the minute of ticket creation, > now + 5 min),
   `description` (empty / > 2000), `result` (> 2000), `followUpNote` (required when
@@ -142,7 +147,10 @@ change.
 - **200** → updated `ActionTaken` (`completedAt` / `cancelledAt` set by the server).
 - **400 `VALIDATION_ERROR`** invalid `status` value; `fields.result` when completing
   without a Result; `expectedUpdatedAt` missing.
-- **409 `INVALID_ACTION_TRANSITION`** not allowed by BR-08 (e.g. COMPLETED → IN_PROGRESS).
+- **409 `ACTION_LOCKED`** the action is COMPLETED or CANCELLED (checked before the
+  transition rule, BR-09).
+- **409 `INVALID_ACTION_TRANSITION`** a move between open states not allowed by BR-08
+  (e.g. IN_PROGRESS → PLANNED, PLANNED → PLANNED).
 - **409 `STALE_UPDATE`** (with `current`), **409 `TICKET_NOT_ACTIVE`**, **404**.
 
 ## 7. List endpoints — drill-down filters (changed — additive, backward compatible)
@@ -282,7 +290,7 @@ each with drill-down `/staff/tickets?status=<S>` or
 |---|---|
 | 200 | idempotent replay of an Action Taken create |
 | 400 | `VALIDATION_ERROR` (Action Taken fields, unknown status in list filter, missing `expectedUpdatedAt`) |
-| 409 | `RESOLUTION_BLOCKED`, `STALE_UPDATE`, `INVALID_ACTION_TRANSITION`, `ACTION_LOCKED`, `TICKET_NOT_ACTIVE` (+ Lab 3 codes) |
+| 409 | `RESOLUTION_BLOCKED`, `STALE_UPDATE`, `INVALID_ACTION_TRANSITION`, `ACTION_LOCKED`, `TICKET_NOT_ACTIVE`, `IDEMPOTENCY_KEY_REUSED` (+ Lab 3 codes) |
 | 422 | `INVALID_ASSIGNEE` (+ Lab 3 `INVALID_OWNER`) |
 | 503 | `GET /api/health/db` with database unreachable |
 
