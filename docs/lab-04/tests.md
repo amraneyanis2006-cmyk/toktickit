@@ -87,7 +87,7 @@ Planned before implementation (Spec DD → Test DD → TDD). Every AC in
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
 |---|---|---|---|---|---|---|
 | MIG-01 | Migration | AC-20 | Lab 4 migration SQL is additive | Contains no DROP/DELETE/ALTER … TYPE on Lab 1–3 objects | server/tests/lab-04/migration.api.test.ts | Planned |
-| MIG-02 | Migration | AC-20, BR-30 | `resolvedAt` backfill | Legacy RESOLVED/CLOSED ticket with null resolvedAt gets updatedAt; active tickets untouched; re-running is a no-op | server/tests/lab-04/migration.api.test.ts | Planned |
+| MIG-02 | Migration | AC-20, spec §7.1 | `resolvedAt` backfill | Legacy RESOLVED/CLOSED ticket with null resolvedAt gets updatedAt; active tickets untouched; re-running is a no-op | server/tests/lab-04/migration.api.test.ts | Planned |
 | MIG-03 | Migration | AC-20 | Lab 1–3 data still valid | Users, Tickets, Attachments, Comments, Notes readable through their Lab 3 endpoints; legacy tickets have actionsTaken [] and statusHistory [] | server/tests/lab-04/migration.api.test.ts | Planned |
 | MIG-04 | Migration | §7.2 | Seed idempotency | Running the seed twice leaves every table count unchanged | server/tests/lab-04/migration.api.test.ts | Planned |
 | REG-01 | Regression | AC-21 | All Lab 1–3 server suites | Pass (only CHG-02 fixture change) | server/tests/lab-01/, server/tests/lab-02/, server/tests/lab-03/ | Planned |

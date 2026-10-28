@@ -104,7 +104,7 @@ final demonstration.
 |----|-------------|
 | FR-19 | Every Lab 1–3 capability remains available to the permitted roles: login/logout/change password, My Tickets (search/filter/sort/paginate), Create Ticket, Ticket Detail, Attachments (add/download/remove), Public Comments, Problem Appears Resolved, Ticket Queue, Claim/Reassign, IT Priority, Internal Notes, User Management. |
 | FR-20 | Loading, validation, success, empty/no-results, forbidden, conflict, not-found, and safe API-failure feedback are consistent across all screens (same components and wording style). |
-| FR-21 | Repeated clicks and network retries cannot create duplicate Actions Taken or apply a status change twice (BR-18, BR-31). |
+| FR-21 | Repeated clicks and network retries cannot create duplicate Actions Taken or apply a status change twice (BR-17, BR-18). |
 | FR-22 | The Action Taken form and the status change keep the entered values after a recoverable failure (network error, 409, 500). |
 | FR-23 | No console errors, broken links, placeholder text, temporary or duplicate UI elements remain; README setup, migration, seed, test, and demo instructions are current. |
 | FR-24 | `GET /api/health` reports the API and database status for the final demonstration. |
