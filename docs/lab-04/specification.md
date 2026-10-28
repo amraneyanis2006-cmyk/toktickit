@@ -147,7 +147,7 @@ change the status (they can only set the advisory indication, BR-14).
 |----|------|
 | BR-11 | Only the transitions in the matrix above are allowed (`409 INVALID_TRANSITION` otherwise), only for IT Staff and Administrators, enforced by the backend. |
 | BR-12 | **Resolution gate.** A Ticket may enter RESOLVED only if (a) it has a Ticket Owner, (b) it has at least one COMPLETED Action Taken, and (c) it has no PLANNED or IN_PROGRESS Action Taken. (a) fails with the Lab 3 code `409 UNASSIGNED_TICKET`; (b)/(c) fail with `409 RESOLUTION_BLOCKED` and `blockers: ["NO_COMPLETED_ACTION", "OPEN_ACTIONS"]` (those that apply). The check runs inside the status endpoint, so a client that bypasses the screen gets the same result. |
-| BR-13 | CLOSED is reachable only from RESOLVED, so every closed Ticket has passed the gate. CANCELLED does not require any Action Taken and needs a UI confirmation step. |
+| BR-13 | CLOSED is reachable only from RESOLVED, so every closed Ticket has passed the gate. CANCELLED does not require any Action Taken and needs a UI confirmation step. Cancelling a Ticket also cancels its open (PLANNED / IN_PROGRESS) Actions Taken in the same transaction (`status = CANCELLED`, `cancelledAt` = the change time); completed and already-cancelled actions are untouched. |
 | BR-14 | A Requester's "Problem Appears Resolved" indication is advisory: it sets `requesterIndicatedResolved = true`, never changes `currentStatus`, appears to IT Staff as "Awaiting review", and is cleared when the Ticket is REOPENED. |
 | BR-15 | Entering RESOLVED sets `resolvedAt = now()`; entering REOPENED clears `resolvedAt`; CLOSED keeps it. |
 | BR-16 | Every successful status change writes exactly one `TicketStatusChange` row (from, to, changed by, changed at) in the **same database transaction** as the status update. These rows are never updated or deleted. |
@@ -469,5 +469,7 @@ into `main`, `reviewer.md` and `ai-use.md` completed, submission PDF Answer Part
    `legalNextStatuses`; (j) CHG-02 (§11.7) also covers the teardown of fixture actions
    and history rows, and the CHG-02 action sits in the shared fixture of the Lab 3 file
    whose tests resolve a Ticket (tests.md REG-01, WF-02/05/06/09 rows updated to match).
-   These tighten BR-10, BR-12 and
-   BR-17; no rule is relaxed.
+   (k) owner decision on PR #70: cancelling a Ticket also cancels its open Actions Taken
+   in the status transaction (BR-13), so no action stays open on a ticket where BR-10
+   forbids further action writes. These tighten BR-10, BR-12, BR-13 and BR-17; no rule
+   is relaxed.

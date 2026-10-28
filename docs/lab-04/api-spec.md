@@ -203,8 +203,9 @@ The UI initialises its `role` and `isActive` filters from the URL
   conditional update
   `WHERE id = :id AND currentStatus = :readStatus` (plus `AND updatedAt =
   :expectedUpdatedAt` when the token is sent; 0 rows → 409 `STALE_UPDATE`),
-  set/clear `resolvedAt`, clear `requesterIndicatedResolved` on REOPENED, insert
-  `TicketStatusChange` (the conditional update is defence in depth behind the
+  set/clear `resolvedAt`, clear `requesterIndicatedResolved` on REOPENED, on CANCELLED
+  set every PLANNED/IN_PROGRESS Action Taken of the ticket to CANCELLED (`cancelledAt`
+  = the change time, BR-13), insert `TicketStatusChange` (the conditional update is defence in depth behind the
   locked-row re-check). Every Action Taken write
   (`POST …/actions`, `PATCH …/actions/:actionId`, `PATCH …/actions/:actionId/status`)
   takes a share lock on the same ticket row

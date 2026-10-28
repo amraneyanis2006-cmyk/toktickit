@@ -600,6 +600,37 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
     }
   });
 
+  it('WF-09: cancelling a Ticket also cancels its open Actions Taken in the same change; finished actions are untouched', async () => {
+    const ticket = await createTicket(prisma, fx);
+    const planned = await addAction(ticket.id, 'PLANNED', 90);
+    const started = await addAction(ticket.id, 'IN_PROGRESS', 60);
+    const done = await addAction(ticket.id, 'COMPLETED', 30);
+    const dropped = await addAction(ticket.id, 'CANCELLED', 20);
+
+    const res = await changeStatus(ticket.ticketNumber, { currentStatus: 'CANCELLED' });
+    expect(res.status).toBe(200);
+    expect(res.body.currentStatus).toBe('CANCELLED');
+
+    const rows = await prisma.actionTaken.findMany({ where: { ticketId: ticket.id }, orderBy: { id: 'asc' } });
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    for (const open of [planned, started]) {
+      const row = byId.get(open.id)!;
+      expect(row.status).toBe('CANCELLED');
+      expect(row.cancelledAt!.toISOString()).toBe(res.body.statusChange.changedAt);
+      expect(row.updatedAt.getTime()).toBeGreaterThan(open.updatedAt.getTime());
+    }
+    expect(byId.get(done.id)).toMatchObject({ status: 'COMPLETED', updatedAt: done.updatedAt, cancelledAt: null });
+    expect(byId.get(dropped.id)).toMatchObject({ status: 'CANCELLED', updatedAt: dropped.updatedAt });
+    expect(await prisma.actionTaken.count({ where: { ticketId: ticket.id, status: { in: ['PLANNED', 'IN_PROGRESS'] } } })).toBe(0);
+    expect(await historyCount(ticket.id)).toBe(1);
+
+    // Other transitions never touch actions.
+    const other = await createTicket(prisma, fx);
+    const stays = await addAction(other.id, 'PLANNED');
+    expect((await changeStatus(other.ticketNumber, { currentStatus: 'WAITING_FOR_REQUESTER' })).status).toBe(200);
+    expect((await prisma.actionTaken.findUniqueOrThrow({ where: { id: stays.id } })).status).toBe('PLANNED');
+  });
+
   it('WF-09: a Ticket without actions can be CANCELLED, and CANCELLED is terminal', async () => {
     const ticket = await createTicket(prisma, fx, { status: 'NEW', ownerId: null });
     const cancelled = await changeStatus(ticket.ticketNumber, { currentStatus: 'CANCELLED' });

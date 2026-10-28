@@ -53,7 +53,7 @@ Planned before implementation (Spec DD → Test DD → TDD). Every AC in
 | WF-06 | Workflow | BR-14, BR-15, BR-16 | Close / reopen | CLOSED keeps resolvedAt; REOPENED clears resolvedAt and requesterIndicatedResolved; a history row per change; resolving again sets a fresh resolvedAt; a legacy RESOLVED ticket without actions can be CLOSED; an owner removed while a close waits gets 409 UNASSIGNED_TICKET | server/tests/lab-04/ticket-workflow.api.test.ts | Planned |
 | WF-07 | Workflow | AC-14 | Requester "Problem Appears Resolved" | Status unchanged; staff detail shows requesterIndicatedResolved = true | server/tests/lab-04/ticket-workflow.api.test.ts | Planned |
 | WF-08 | Workflow | AC-15, BR-19, BR-20 | Role-appropriate visibility and ordering | Requester detail has actionsTaken + statusHistory (ordered) and no `internalNotes` key; staff detail has all plus resolutionGate | server/tests/lab-04/ticket-workflow.api.test.ts | Planned |
-| WF-09 | Workflow | BR-13 | Cancel a Ticket without actions; action writes racing a cancel | 200 CANCELLED; CANCELLED is terminal; an action edit or status change racing the cancel gets 409 TICKET_NOT_ACTIVE and changes nothing | server/tests/lab-04/ticket-workflow.api.test.ts | Planned |
+| WF-09 | Workflow | BR-13 | Cancel a Ticket without actions; cancel with open actions; action writes racing a cancel | 200 CANCELLED; CANCELLED is terminal; open actions become CANCELLED with `cancelledAt` = the change time in the same change, finished actions untouched, other transitions never touch actions; an action edit or status change racing the cancel gets 409 TICKET_NOT_ACTIVE and changes nothing | server/tests/lab-04/ticket-workflow.api.test.ts | Planned |
 
 ## 4. API / Integration Tests — Dashboards
 

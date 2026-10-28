@@ -158,7 +158,8 @@ your ticket"; no Created-by column (shows Performed by only).
   `legalNextStatuses`; "Resolved" stays visible but **disabled** when
   `resolutionGate.canResolve` is false, with the reason underneath:
   "To resolve, complete at least one action and close all open actions." or
-  "Assign a Ticket Owner first.". CANCELLED keeps its confirmation dialog.
+  "Assign a Ticket Owner first.". CANCELLED keeps its confirmation dialog; when the Ticket has open actions the dialog
+  says they will be cancelled too ("This also cancels n open action(s).").
 - The backend stays the authority: a `409 RESOLUTION_BLOCKED` /
   `INVALID_TRANSITION` / `STALE_UPDATE` shows a `zg-callout-error` with the
   server message, the selection is reset, and the Ticket reloads.
