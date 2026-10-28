@@ -364,6 +364,8 @@ describe('Stale and concurrent status changes (BR-17)', () => {
     const back = await changeStatus(ticket.ticketNumber, { currentStatus: 'WAITING_FOR_REQUESTER' });
     expect(back.status).toBe(200);
     const bothBad = await changeStatus(ticket.ticketNumber, { currentStatus: 'FOO', expectedUpdatedAt: 'yesterday' });
+    expect(bothBad.status).toBe(400);
+    expect(bothBad.body.error).toBe('VALIDATION_ERROR');
     expect(Object.keys(bothBad.body.fields).sort()).toEqual(['currentStatus', 'expectedUpdatedAt']);
     expect((await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } })).currentStatus).toBe('WAITING_FOR_REQUESTER');
   });
@@ -424,10 +426,13 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
 
     const resolved = await changeStatus(ticket.ticketNumber, { currentStatus: 'RESOLVED' });
     expect(resolved.status).toBe(200);
+    // BR-14: the indication survives resolve and close; only REOPENED clears it.
+    expect(resolved.body.requesterIndicatedResolved).toBe(true);
     const closed = await changeStatus(ticket.ticketNumber, { currentStatus: 'CLOSED', expectedUpdatedAt: resolved.body.updatedAt });
     expect(closed.status).toBe(200);
     expect(closed.body.resolvedAt).toBe(resolved.body.resolvedAt);
     expect(closed.body.legalNextStatuses).toEqual(['REOPENED']);
+    expect(closed.body.requesterIndicatedResolved).toBe(true);
 
     const reopened = await changeStatus(ticket.ticketNumber, { currentStatus: 'REOPENED', expectedUpdatedAt: closed.body.updatedAt });
     expect(reopened.status).toBe(200);
@@ -507,6 +512,11 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
 
     const again = await request(app).get(`/api/tickets/${ticket.ticketNumber}`).set('Cookie', requesterCookie);
     expect(again.body.statusHistory).toEqual(own.body.statusHistory);
+
+    // AC-15: no endpoint deletes Status History.
+    const del = await request(app).delete(statusUrl(ticket.ticketNumber)).set('Cookie', staffCookie);
+    expect(del.status).toBe(404);
+    expect(await historyCount(ticket.id)).toBe(2);
 
     const resolvedTicket = await createTicket(prisma, fx, { requesterId: fx.requesterA.id });
     await addAction(resolvedTicket.id, 'COMPLETED');

@@ -111,7 +111,9 @@ an empty key (Lab 3 AC-09). Another Requester's Ticket → `404 NOT_FOUND`.
   `followUpRequired` is true; > 1000), `attachmentNotes` (> 500),
   `clientRequestId` (not a UUID).
 - **404 `NOT_FOUND`** unknown ticket.
-- **409 `TICKET_NOT_ACTIVE`** ticket is RESOLVED, CLOSED, or CANCELLED (BR-10).
+- **409 `TICKET_NOT_ACTIVE`** ticket is RESOLVED, CLOSED, or CANCELLED (BR-10); re-checked on the
+  share-locked ticket row inside the write transaction (§8), so it can also follow a
+  concurrent status change.
 - **422 `INVALID_ASSIGNEE`** `performedById` is not an active IT Staff/Administrator.
 
 ## 5. PATCH /api/staff/tickets/:ticketNumber/actions/:actionId 🔒S
@@ -137,7 +139,7 @@ change.
 - **409 `STALE_UPDATE`** `expectedUpdatedAt` ≠ stored `updatedAt`; body includes
   `"current": ActionTaken` so the client can refresh (BR-17).
 - **409 `ACTION_LOCKED`** action is COMPLETED or CANCELLED (BR-09).
-- **409 `TICKET_NOT_ACTIVE`** (BR-10).
+- **409 `TICKET_NOT_ACTIVE`** (BR-10; re-checked on the share-locked ticket row, §8).
 - **422 `INVALID_ASSIGNEE`** (BR-05).
 
 ## 6. PATCH /api/staff/tickets/:ticketNumber/actions/:actionId/status 🔒S
@@ -152,7 +154,8 @@ change.
   transition rule, BR-09).
 - **409 `INVALID_ACTION_TRANSITION`** a move between open states not allowed by BR-08
   (e.g. IN_PROGRESS → PLANNED, PLANNED → PLANNED).
-- **409 `STALE_UPDATE`** (with `current`), **409 `TICKET_NOT_ACTIVE`**, **404**.
+- **409 `STALE_UPDATE`** (with `current`), **409 `TICKET_NOT_ACTIVE`** (re-checked on the
+  share-locked ticket row, §8), **404**.
 
 ## 7. List endpoints — drill-down filters (changed — additive, backward compatible)
 
@@ -194,7 +197,7 @@ The UI initialises its `role` and `isActive` filters from the URL
 - **Processing order:** validate value → load ticket (404) → stale check (409
   `STALE_UPDATE`) → matrix (409 `INVALID_TRANSITION`) → owner check for
   RESOLVED/CLOSED (409 `UNASSIGNED_TICKET`) → **one transaction**: lock the ticket
-  row (`SELECT … FOR UPDATE`) and re-read it → on the locked row: status and token
+  row (`SELECT … FOR NO KEY UPDATE`) and re-read it → on the locked row: status and token
   unchanged (else 409 `STALE_UPDATE`) → owner for RESOLVED/CLOSED (else 409
   `UNASSIGNED_TICKET`) → resolution gate for RESOLVED (409 `RESOLUTION_BLOCKED`) →
   conditional update
@@ -234,7 +237,9 @@ The UI initialises its `role` and `isActive` filters from the URL
   (`ticketNumber`, `currentStatus`, `requesterIndicatedResolved`, `resolvedAt`,
   `updatedAt`, `legalNextStatuses`).
 - **400 `VALIDATION_ERROR`** with `fields.currentStatus` (missing/unknown value) or
-  `fields.expectedUpdatedAt` (sent but not an ISO-8601 date-time).
+  `fields.expectedUpdatedAt` (sent but not an ISO-8601 date-time with a time zone).
+  A lock wait longer than the 15 s transaction timeout ends in a generic
+  `500 INTERNAL_ERROR` (known limitation).
 
 ## 9. GET /api/dashboard/requester 🔒R
 

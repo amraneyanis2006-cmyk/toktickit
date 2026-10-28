@@ -452,7 +452,7 @@ into `main`, `reviewer.md` and `ai-use.md` completed, submission PDF Answer Part
 9. **Known Lab 3 schema drift, intentionally left untouched.** The Lab 3 hand-written migration left three `User` column defaults (`role`, `mustChangePassword`, `updatedAt`) and the `TicketComment`/`TicketInternalNote` foreign-key rules different from `schema.prisma`; fixing it would require a non-additive migration (`DROP DEFAULT`/`DROP CONSTRAINT`), so the Lab 4 migration is generated as a Lab 3 → Lab 4 schema diff and applied with `prisma migrate deploy`.
 10. **Contract amendments made with Issue #62 (stated in its PR):** api-spec §8 now
    (a) evaluates the resolution gate inside the status transaction after locking the
-   ticket row (`FOR UPDATE`), while Action Taken writes take a share lock on the same
+   ticket row (`FOR NO KEY UPDATE`), while Action Taken writes take a share lock on the same
    row and re-read the ticket status, so a resolve, cancel or close and a concurrent
    action write are serialized; (b) adds `AND updatedAt = :expectedUpdatedAt` to the
    conditional update when the token is sent (defence in depth, not reachable once the
@@ -463,4 +463,11 @@ into `main`, `reviewer.md` and `ai-use.md` completed, submission PDF Answer Part
    token (`STALE_UPDATE`), then owner (`UNASSIGNED_TICKET`), then the gate; (g) answers
    an invalid body with `400 VALIDATION_ERROR` and `fields.currentStatus` /
    `fields.expectedUpdatedAt` (a token must be an ISO-8601 date-time with a time zone)
-   before looking the ticket up. These tighten BR-12 and BR-17; no rule is relaxed.
+   before looking the ticket up; (h) the Action Taken endpoints (api-spec §4-§6) re-check
+   `TICKET_NOT_ACTIVE` on the share-locked ticket row inside their write transaction;
+   (i) api-spec §0 states that `resolutionGate` is meaningful only when `RESOLVED` is in
+   `legalNextStatuses`; (j) CHG-02 (§11.7) also covers the teardown of fixture actions
+   and history rows, and the CHG-02 action sits in the shared fixture of the Lab 3 file
+   whose tests resolve a Ticket (tests.md REG-01, WF-02/05/06/09 rows updated to match).
+   The status transaction locks with `FOR NO KEY UPDATE`. These tighten BR-10, BR-12 and
+   BR-17; no rule is relaxed.

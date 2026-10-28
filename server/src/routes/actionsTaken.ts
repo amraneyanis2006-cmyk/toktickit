@@ -92,10 +92,11 @@ async function staleUpdate(res: Response, actionId: number) {
 }
 
 /**
- * Conditional update on the updatedAt the client last saw (BR-17): if another
- * request changed the row in between, 0 rows match and nothing is written.
+ * Conditional update on the updatedAt the client last saw (BR-17), inside a
+ * transaction that share-locks the ticket and re-reads its status (BR-10):
+ * 'inactive' if the ticket is no longer active, 'stale' if another request
+ * changed the action in between (0 rows match), otherwise 'updated'.
  */
-
 async function updateIfUnchanged(
   ticketId: number,
   actionId: number,

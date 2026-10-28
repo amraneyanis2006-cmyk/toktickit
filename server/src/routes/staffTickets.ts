@@ -434,7 +434,9 @@ router.patch(
         // (routes/actionsTaken.ts), so no open action can appear between the
         // gate read below and this commit (BR-12). Everything after the lock
         // works on the locked row, not on the earlier read.
-        await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticket.id} FOR UPDATE`;
+        // FOR NO KEY UPDATE still conflicts with the Action Taken FOR SHARE, but
+        // not with the FOR KEY SHARE that comment/note/attachment inserts take.
+        await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticket.id} FOR NO KEY UPDATE`;
         const locked = await tx.ticket.findUniqueOrThrow({ where: { id: ticket.id } });
         if (locked.currentStatus !== current) throw new StaleStatusError();
         if (expected && locked.updatedAt.getTime() !== expected.getTime()) throw new StaleStatusError();
