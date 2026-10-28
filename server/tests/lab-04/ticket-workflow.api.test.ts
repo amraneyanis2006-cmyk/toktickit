@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import { PrismaClient } from '@prisma/client';
-import type { TicketStatus } from '@prisma/client';
+import type { Prisma, TicketStatus } from '@prisma/client';
 import app from '../../src/app';
 import { isValidTransition } from '../../src/utils/statusTransition';
 import { createFixture, cleanupPrefix, createTicket, loginAs } from './fixtures';
@@ -14,6 +14,19 @@ const STATUSES: TicketStatus[] = ['NEW', 'OPEN', 'IN_PROGRESS', 'WAITING_FOR_REQ
 let fx: Lab4Fixture;
 let staffCookie: string;
 let staffBCookie: string;
+let adminCookie: string;
+
+// The 17 legal edges of specification.md sec 5.1, written out independently of
+// the production matrix so a wrong edge in the code cannot hide (AC-10).
+const LEGAL_EDGES = new Set([
+  'NEW>OPEN', 'NEW>IN_PROGRESS', 'NEW>CANCELLED',
+  'OPEN>IN_PROGRESS', 'OPEN>CANCELLED',
+  'IN_PROGRESS>WAITING_FOR_REQUESTER', 'IN_PROGRESS>RESOLVED', 'IN_PROGRESS>CANCELLED',
+  'WAITING_FOR_REQUESTER>IN_PROGRESS', 'WAITING_FOR_REQUESTER>RESOLVED', 'WAITING_FOR_REQUESTER>CANCELLED',
+  'RESOLVED>CLOSED', 'RESOLVED>REOPENED',
+  'CLOSED>REOPENED',
+  'REOPENED>IN_PROGRESS', 'REOPENED>WAITING_FOR_REQUESTER', 'REOPENED>CANCELLED',
+]);
 
 const statusUrl = (ticketNumber: string) => `/api/staff/tickets/${ticketNumber}/status`;
 
@@ -50,7 +63,46 @@ beforeAll(async () => {
   fx = await createFixture(prisma, PREFIX);
   staffCookie = await loginAs(fx.staffA.email);
   staffBCookie = await loginAs(fx.staffB.email);
+  adminCookie = await loginAs(fx.admin.email);
 });
+
+/**
+ * Forces an interleaving deterministically: a separate transaction locks the
+ * ticket row and makes `change`, then fires the request and waits before
+ * committing. The request reads the old committed row, then has to wait for
+ * the lock - exactly the "changed between read and write" window.
+ */
+async function raceAgainst<T>(
+  ticketId: number,
+  mode: 'UPDATE' | 'SHARE',
+  change: (tx: Prisma.TransactionClient) => Promise<unknown>,
+  fire: () => PromiseLike<T>
+): Promise<T> {
+  let pending!: Promise<T>;
+  await prisma.$transaction(
+    async (tx) => {
+      if (mode === 'UPDATE') await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticketId} FOR UPDATE`;
+      else await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticketId} FOR SHARE`;
+      await change(tx);
+      pending = Promise.resolve(fire());
+      await waitForBlockedRequest();
+    },
+    { timeout: 15000 }
+  );
+  return pending;
+}
+
+/** Proves the interleaving: waits until another backend is waiting for a row lock (fails after 8 s). */
+async function waitForBlockedRequest() {
+  const deadline = Date.now() + 8000;
+  for (;;) {
+    const rows = await prisma.$queryRaw<Array<{ waiting: number }>>`
+      SELECT count(*)::int AS waiting FROM pg_locks WHERE NOT granted`;
+    if ((rows[0]?.waiting ?? 0) > 0) return;
+    if (Date.now() > deadline) throw new Error('The request never waited on the ticket row lock - interleaving not forced.');
+    await new Promise((r) => setTimeout(r, 25));
+  }
+}
 
 afterAll(async () => {
   await cleanupPrefix(prisma, PREFIX);
@@ -92,13 +144,56 @@ describe('Resolution gate on PATCH /api/staff/tickets/:ticketNumber/status', () 
     const both = await createTicket(prisma, fx);
     await addAction(both.id, 'PLANNED');
     const res = await changeStatus(both.ticketNumber, { currentStatus: 'RESOLVED' });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('RESOLUTION_BLOCKED');
     expect(res.body.blockers).toEqual(['NO_COMPLETED_ACTION', 'OPEN_ACTIONS']);
+    expect((await prisma.ticket.findUniqueOrThrow({ where: { id: both.id } })).currentStatus).toBe('IN_PROGRESS');
+    expect(await historyCount(both.id)).toBe(0);
 
     // An unowned ticket still fails first with the Lab 3 code.
     const unowned = await createTicket(prisma, fx, { ownerId: null });
     const noOwner = await changeStatus(unowned.ticketNumber, { currentStatus: 'RESOLVED' });
     expect(noOwner.status).toBe(409);
     expect(noOwner.body.error).toBe('UNASSIGNED_TICKET');
+  });
+
+  it('WF-02: an action created while a resolve is in flight is seen by the gate (no RESOLVED ticket with an open action)', async () => {
+    const ticket = await resolvable();
+    // Another request is creating a PLANNED action and holds the ticket row (FOR SHARE, as POST .../actions does).
+    const res = await raceAgainst(
+      ticket.id,
+      'SHARE',
+      (tx) =>
+        tx.actionTaken.create({
+          data: {
+            ticketId: ticket.id, actionAt: new Date(), description: 'Concurrent open action', status: 'PLANNED',
+            performedById: fx.staffA.id, createdById: fx.staffA.id,
+          },
+        }),
+      () => changeStatus(ticket.ticketNumber, { currentStatus: 'RESOLVED' })
+    );
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('RESOLUTION_BLOCKED');
+    expect(res.body.blockers).toEqual(['OPEN_ACTIONS']);
+    expect((await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } })).currentStatus).toBe('IN_PROGRESS');
+  });
+
+  it('WF-02: an action create racing a resolve that commits first is refused with TICKET_NOT_ACTIVE', async () => {
+    const ticket = await resolvable();
+    const res = await raceAgainst(
+      ticket.id,
+      'UPDATE',
+      (tx) => tx.ticket.update({ where: { id: ticket.id }, data: { currentStatus: 'RESOLVED', resolvedAt: new Date() } }),
+      () =>
+        request(app)
+          .post(`/api/staff/tickets/${ticket.ticketNumber}/actions`)
+          .set('Cookie', staffCookie)
+          .send({ actionAt: new Date().toISOString(), description: 'Late open action', followUpRequired: false })
+    );
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('TICKET_NOT_ACTIVE');
+    const open = await prisma.actionTaken.count({ where: { ticketId: ticket.id, status: { in: ['PLANNED', 'IN_PROGRESS'] } } });
+    expect(open).toBe(0);
   });
 
   it('WF-03: resolving when the gate is met sets RESOLVED, resolvedAt, exactly one history row, and the api-spec sec 8 shape', async () => {
@@ -123,6 +218,7 @@ describe('Resolution gate on PATCH /api/staff/tickets/:ticketNumber/status', () 
       },
     });
     expect(new Date(res.body.resolvedAt).getTime()).toBeGreaterThanOrEqual(before - 1000);
+    expect(res.body.resolvedAt).toBe(res.body.statusChange.changedAt);
     expect(typeof res.body.statusChange.id).toBe('number');
 
     const rows = await prisma.ticketStatusChange.findMany({ where: { ticketId: ticket.id } });
@@ -133,6 +229,18 @@ describe('Resolution gate on PATCH /api/staff/tickets/:ticketNumber/status', () 
     expect(row.resolvedAt!.toISOString()).toBe(res.body.resolvedAt);
     expect(row.updatedAt.toISOString()).toBe(res.body.updatedAt);
   });
+
+  it('WF-03: an Administrator can resolve, and WAITING_FOR_REQUESTER -> RESOLVED is gated the same way', async () => {
+    const waiting = await resolvable({ status: 'WAITING_FOR_REQUESTER' });
+    const res = await changeStatus(waiting.ticketNumber, { currentStatus: 'RESOLVED' }, adminCookie);
+    expect(res.status).toBe(200);
+    expect(res.body.statusChange).toMatchObject({ fromStatus: 'WAITING_FOR_REQUESTER', toStatus: 'RESOLVED', changedBy: { id: fx.admin.id } });
+
+    const blocked = await createTicket(prisma, fx, { status: 'WAITING_FOR_REQUESTER' });
+    const refused = await changeStatus(blocked.ticketNumber, { currentStatus: 'RESOLVED' }, adminCookie);
+    expect(refused.status).toBe(409);
+    expect(refused.body.blockers).toEqual(['NO_COMPLETED_ACTION']);
+  });
 });
 
 describe('Transition matrix (BR-11)', () => {
@@ -142,7 +250,10 @@ describe('Transition matrix (BR-11)', () => {
     for (const from of STATUSES) {
       await prisma.ticket.update({ where: { id: ticket.id }, data: { currentStatus: from } });
       for (const to of STATUSES) {
-        if (isValidTransition(from, to)) continue;
+        if (LEGAL_EDGES.has(`${from}>${to}`)) {
+          expect(isValidTransition(from, to), `legal ${from} -> ${to}`).toBe(true);
+          continue;
+        }
         const res = await changeStatus(ticket.ticketNumber, { currentStatus: to });
         expect(res.status, `${from} -> ${to}`).toBe(409);
         expect(res.body.error, `${from} -> ${to}`).toBe('INVALID_TRANSITION');
@@ -168,6 +279,14 @@ describe('Stale and concurrent status changes (BR-17)', () => {
     expect(stale.status).toBe(409);
     expect(stale.body.error).toBe('STALE_UPDATE');
     expect(stale.body.current).toMatchObject({ ticketNumber: ticket.ticketNumber, currentStatus: 'WAITING_FOR_REQUESTER', updatedAt: first.body.updatedAt });
+    expect(Object.keys(stale.body.current).sort()).toEqual(
+      ['currentStatus', 'legalNextStatuses', 'requesterIndicatedResolved', 'resolvedAt', 'ticketNumber', 'updatedAt'].sort()
+    );
+
+    // The stale check runs before the matrix (api-spec sec 8 order).
+    const staleIllegal = await changeStatus(ticket.ticketNumber, { currentStatus: 'OPEN', expectedUpdatedAt: staleToken });
+    expect(staleIllegal.status).toBe(409);
+    expect(staleIllegal.body.error).toBe('STALE_UPDATE');
     const row = await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } });
     expect(row.currentStatus).toBe('WAITING_FOR_REQUESTER');
     expect(await historyCount(ticket.id)).toBe(1);
@@ -175,6 +294,50 @@ describe('Stale and concurrent status changes (BR-17)', () => {
     const invalidToken = await changeStatus(ticket.ticketNumber, { currentStatus: 'IN_PROGRESS', expectedUpdatedAt: 'yesterday' });
     expect(invalidToken.status).toBe(400);
     expect(invalidToken.body.error).toBe('VALIDATION_ERROR');
+    expect(invalidToken.body.fields.expectedUpdatedAt).toBeDefined();
+
+    for (const body of [{}, { currentStatus: 'FOO' }, { currentStatus: 42 }]) {
+      const bad = await changeStatus(ticket.ticketNumber, body);
+      expect(bad.status, JSON.stringify(body)).toBe(400);
+      expect(bad.body.fields.currentStatus, JSON.stringify(body)).toBeDefined();
+    }
+    // null means "not sent" (Lab 3 clients never send the token).
+    const nullToken = await changeStatus(ticket.ticketNumber, { currentStatus: 'IN_PROGRESS', expectedUpdatedAt: null });
+    expect(nullToken.status).toBe(200);
+    const back = await changeStatus(ticket.ticketNumber, { currentStatus: 'WAITING_FOR_REQUESTER' });
+    expect(back.status).toBe(200);
+    const bothBad = await changeStatus(ticket.ticketNumber, { currentStatus: 'FOO', expectedUpdatedAt: 'yesterday' });
+    expect(Object.keys(bothBad.body.fields).sort()).toEqual(['currentStatus', 'expectedUpdatedAt']);
+    expect((await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } })).currentStatus).toBe('WAITING_FOR_REQUESTER');
+  });
+
+  it('WF-05: a status changed between the read and the write is 409 STALE_UPDATE (conditional update, 0 rows)', async () => {
+    const ticket = await resolvable();
+    const res = await raceAgainst(
+      ticket.id,
+      'UPDATE',
+      (tx) => tx.ticket.update({ where: { id: ticket.id }, data: { currentStatus: 'WAITING_FOR_REQUESTER' } }),
+      () => changeStatus(ticket.ticketNumber, { currentStatus: 'CANCELLED' })
+    );
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('STALE_UPDATE');
+    expect(res.body.current.currentStatus).toBe('WAITING_FOR_REQUESTER');
+    expect((await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } })).currentStatus).toBe('WAITING_FOR_REQUESTER');
+    expect(await historyCount(ticket.id)).toBe(0);
+  });
+
+  it('WF-05: with expectedUpdatedAt, any update landing between the check and the write is 409 STALE_UPDATE', async () => {
+    const ticket = await resolvable();
+    const res = await raceAgainst(
+      ticket.id,
+      'UPDATE',
+      (tx) => tx.ticket.update({ where: { id: ticket.id }, data: { itPriority: 'HIGH' } }),
+      () => changeStatus(ticket.ticketNumber, { currentStatus: 'WAITING_FOR_REQUESTER', expectedUpdatedAt: ticket.updatedAt.toISOString() })
+    );
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('STALE_UPDATE');
+    expect((await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } })).currentStatus).toBe('IN_PROGRESS');
+    expect(await historyCount(ticket.id)).toBe(0);
   });
 
   it('WF-05: two parallel transitions - exactly one succeeds and exactly one history row is written', async () => {
@@ -184,7 +347,12 @@ describe('Stale and concurrent status changes (BR-17)', () => {
       const results = await Promise.all([changeStatus(ticket.ticketNumber, body), changeStatus(ticket.ticketNumber, body, staffBCookie)]);
       expect(results.map((r) => r.status).sort(), `token=${withToken}`).toEqual([200, 409]);
       const loser = results.find((r) => r.status === 409)!;
-      expect(['STALE_UPDATE', 'INVALID_TRANSITION']).toContain(loser.body.error);
+      if (withToken) {
+        expect(loser.body.error).toBe('STALE_UPDATE');
+        expect(loser.body.current).toBeDefined();
+      } else {
+        expect(['STALE_UPDATE', 'INVALID_TRANSITION']).toContain(loser.body.error);
+      }
       expect(await historyCount(ticket.id), `token=${withToken}`).toBe(1);
     }
   });
@@ -216,6 +384,12 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
     const row = await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } });
     expect(row.resolvedAt).toBeNull();
     expect(row.requesterIndicatedResolved).toBe(false);
+
+    // Resolving again after a reopen sets a fresh resolvedAt.
+    expect((await changeStatus(ticket.ticketNumber, { currentStatus: 'IN_PROGRESS' })).status).toBe(200);
+    const again = await changeStatus(ticket.ticketNumber, { currentStatus: 'RESOLVED' });
+    expect(again.status).toBe(200);
+    expect(new Date(again.body.resolvedAt).getTime()).toBeGreaterThan(new Date(resolved.body.resolvedAt).getTime());
   });
 
   it('WF-07: the Requester "Problem Appears Resolved" never changes the status; staff detail shows requesterIndicatedResolved', async () => {
@@ -248,6 +422,7 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
     expect(own.status).toBe(200);
     expect(own.body).not.toHaveProperty('internalNotes');
     expect(own.body).not.toHaveProperty('resolutionGate');
+    expect(own.body).toHaveProperty('resolvedAt', null);
     expect(own.body.actionsTaken.map((a: { id: number }) => a.id)).toEqual([early.id, late.id]);
     expect(own.body.statusHistory.map((h: { fromStatus: string; toStatus: string }) => `${h.fromStatus}->${h.toStatus}`)).toEqual([
       'IN_PROGRESS->WAITING_FOR_REQUESTER',
@@ -273,6 +448,44 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
 
     const again = await request(app).get(`/api/tickets/${ticket.ticketNumber}`).set('Cookie', requesterCookie);
     expect(again.body.statusHistory).toEqual(own.body.statusHistory);
+
+    // Unowned tickets report UNASSIGNED in the detail gate.
+    const unowned = await createTicket(prisma, fx, { ownerId: null });
+    const unownedDetail = await request(app).get(`/api/staff/tickets/${unowned.ticketNumber}`).set('Cookie', staffCookie);
+    expect(unownedDetail.body.resolutionGate).toEqual({ canResolve: false, blockers: ['UNASSIGNED', 'NO_COMPLETED_ACTION'] });
+
+    // History is ordered by changedAt, then id - not by insertion order.
+    const ordered = await createTicket(prisma, fx, { status: 'RESOLVED', resolvedAt: new Date() });
+    const later = await prisma.ticketStatusChange.create({
+      data: { ticketId: ordered.id, fromStatus: 'IN_PROGRESS', toStatus: 'RESOLVED', changedById: fx.staffA.id, changedAt: new Date(Date.now() - 60_000) },
+    });
+    const earlier = await prisma.ticketStatusChange.create({
+      data: { ticketId: ordered.id, fromStatus: 'NEW', toStatus: 'IN_PROGRESS', changedById: fx.staffA.id, changedAt: new Date(Date.now() - 120_000) },
+    });
+    const orderedDetail = await request(app).get(`/api/staff/tickets/${ordered.ticketNumber}`).set('Cookie', staffCookie);
+    expect(orderedDetail.body.statusHistory.map((h: { id: number }) => h.id)).toEqual([earlier.id, later.id]);
+    expect(orderedDetail.body.legalNextStatuses).toEqual(['CLOSED', 'REOPENED']);
+  });
+
+  it('WF-09: an action edit or status change racing a ticket cancel is refused with TICKET_NOT_ACTIVE', async () => {
+    for (const route of ['edit', 'status'] as const) {
+      const ticket = await createTicket(prisma, fx);
+      const action = await addAction(ticket.id, 'PLANNED');
+      const url = `/api/staff/tickets/${ticket.ticketNumber}/actions/${action.id}${route === 'status' ? '/status' : ''}`;
+      const body = route === 'status'
+        ? { status: 'IN_PROGRESS', expectedUpdatedAt: action.updatedAt.toISOString() }
+        : { description: 'Edited during a cancel', expectedUpdatedAt: action.updatedAt.toISOString() };
+      const res = await raceAgainst(
+        ticket.id,
+        'UPDATE',
+        (tx) => tx.ticket.update({ where: { id: ticket.id }, data: { currentStatus: 'CANCELLED' } }),
+        () => request(app).patch(url).set('Cookie', staffCookie).send(body)
+      );
+      expect(res.status, route).toBe(409);
+      expect(res.body.error, route).toBe('TICKET_NOT_ACTIVE');
+      const row = await prisma.actionTaken.findUniqueOrThrow({ where: { id: action.id } });
+      expect(row.updatedAt.toISOString(), route).toBe(action.updatedAt.toISOString());
+    }
   });
 
   it('WF-09: a Ticket without actions can be CANCELLED, and CANCELLED is terminal', async () => {

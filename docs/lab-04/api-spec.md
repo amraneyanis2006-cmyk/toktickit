@@ -188,14 +188,20 @@ The UI initialises its `role` and `isActive` filters from the URL
 ## 8. PATCH /api/staff/tickets/:ticketNumber/status 🔒S (changed)
 
 - **Request** `{ "currentStatus": "RESOLVED", "expectedUpdatedAt": "2026-10-28T03:40:12.000Z" }`
-  (`expectedUpdatedAt` optional for Lab 3 compatibility; always sent by the Lab 4 UI).
+  (`expectedUpdatedAt` optional for Lab 3 compatibility - omitted or `null` means not
+  sent; always sent by the Lab 4 UI).
 - **Processing order:** validate value → load ticket (404) → stale check (409
   `STALE_UPDATE`) → matrix (409 `INVALID_TRANSITION`) → owner check for
-  RESOLVED/CLOSED (409 `UNASSIGNED_TICKET`) → resolution gate for RESOLVED (409
-  `RESOLUTION_BLOCKED`) → **one transaction**: conditional update
-  `WHERE id = :id AND currentStatus = :readStatus` (0 rows → 409 `STALE_UPDATE`),
+  RESOLVED/CLOSED (409 `UNASSIGNED_TICKET`) → **one transaction**: lock the ticket
+  row (`SELECT … FOR UPDATE`) → resolution gate for RESOLVED (409
+  `RESOLUTION_BLOCKED`) → conditional update
+  `WHERE id = :id AND currentStatus = :readStatus` (plus `AND updatedAt =
+  :expectedUpdatedAt` when the token is sent; 0 rows → 409 `STALE_UPDATE`),
   set/clear `resolvedAt`, clear `requesterIndicatedResolved` on REOPENED, insert
-  `TicketStatusChange`.
+  `TicketStatusChange`. `POST …/actions` takes a share lock on the same ticket row
+  and re-reads its status in its own transaction, so a concurrent resolve and action
+  create are serialized: either the gate sees the new open action or the create gets
+  `409 TICKET_NOT_ACTIVE`.
 - **200**
 ```json
 {
@@ -214,6 +220,15 @@ The UI initialises its `role` and `isActive` filters from the URL
   "message": "This ticket cannot be resolved yet: complete or cancel the open actions.",
   "blockers": ["OPEN_ACTIONS"] }
 ```
+  (`blockers` ⊆ `["NO_COMPLETED_ACTION", "OPEN_ACTIONS"]`; an unowned ticket fails
+  earlier with `UNASSIGNED_TICKET`.)
+- **409 `STALE_UPDATE`** (stale `expectedUpdatedAt`, or another request changed the
+  status between the read and the conditional update): body includes `"current"`,
+  the ticket's latest summary in the 200 shape without `statusChange`
+  (`ticketNumber`, `currentStatus`, `requesterIndicatedResolved`, `resolvedAt`,
+  `updatedAt`, `legalNextStatuses`).
+- **400 `VALIDATION_ERROR`** with `fields.currentStatus` (missing/unknown value) or
+  `fields.expectedUpdatedAt` (sent but not an ISO-8601 date-time).
 
 ## 9. GET /api/dashboard/requester 🔒R
 

@@ -46,14 +46,14 @@ Planned before implementation (Spec DD → Test DD → TDD). Every AC in
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
 |---|---|---|---|---|---|---|
 | WF-01 | Workflow | AC-08 | Resolve with no completed action | 409 RESOLUTION_BLOCKED, blockers [NO_COMPLETED_ACTION]; status unchanged | server/tests/lab-04/ticket-workflow.api.test.ts | Planned |
-| WF-02 | Workflow | AC-08 | Resolve with an open action (direct API call, no UI) | 409 RESOLUTION_BLOCKED, blockers [OPEN_ACTIONS]; status unchanged | server/tests/lab-04/ticket-workflow.api.test.ts | Planned |
+| WF-02 | Workflow | AC-08 | Resolve with an open action (direct API call, no UI); resolve racing an action create | 409 RESOLUTION_BLOCKED, blockers [OPEN_ACTIONS]; status unchanged; an action created during a resolve is seen by the gate, and a create after a committed resolve gets 409 TICKET_NOT_ACTIVE (row-lock interleaving forced by the test) | server/tests/lab-04/ticket-workflow.api.test.ts | Planned |
 | WF-03 | Workflow | AC-09, BR-15, BR-16 | Resolve when the gate is met | 200 RESOLVED; resolvedAt set; exactly one history row; legalNextStatuses [CLOSED, REOPENED] | server/tests/lab-04/ticket-workflow.api.test.ts | Planned |
 | WF-04 | Workflow | AC-10, BR-11 | Every pair not in the matrix | 409 INVALID_TRANSITION, status unchanged (all 8×8 pairs checked) | server/tests/lab-04/ticket-workflow.api.test.ts | Planned |
-| WF-05 | Workflow | AC-12, BR-17 | Stale and concurrent status changes | Stale expectedUpdatedAt → 409 STALE_UPDATE; two parallel transitions → one 200 and one 409, one history row | server/tests/lab-04/ticket-workflow.api.test.ts | Planned |
+| WF-05 | Workflow | AC-12, BR-17 | Stale and concurrent status changes | Stale expectedUpdatedAt → 409 STALE_UPDATE with `current` (checked before the matrix); status changed between read and write → 409 STALE_UPDATE (conditional update, 0 rows); with a token, any update in that window → 409 STALE_UPDATE; two parallel transitions → one 200 and one 409, one history row; invalid `currentStatus`/`expectedUpdatedAt` → 400 with both `fields` | server/tests/lab-04/ticket-workflow.api.test.ts | Planned |
 | WF-06 | Workflow | BR-14, BR-15, BR-16 | Close / reopen | CLOSED keeps resolvedAt; REOPENED clears resolvedAt and requesterIndicatedResolved; a history row per change | server/tests/lab-04/ticket-workflow.api.test.ts | Planned |
 | WF-07 | Workflow | AC-14 | Requester "Problem Appears Resolved" | Status unchanged; staff detail shows requesterIndicatedResolved = true | server/tests/lab-04/ticket-workflow.api.test.ts | Planned |
 | WF-08 | Workflow | AC-15, BR-19, BR-20 | Role-appropriate visibility and ordering | Requester detail has actionsTaken + statusHistory (ordered) and no `internalNotes` key; staff detail has all plus resolutionGate | server/tests/lab-04/ticket-workflow.api.test.ts | Planned |
-| WF-09 | Workflow | BR-13 | Cancel a Ticket without actions | 200 CANCELLED; CANCELLED is terminal | server/tests/lab-04/ticket-workflow.api.test.ts | Planned |
+| WF-09 | Workflow | BR-13 | Cancel a Ticket without actions; action writes racing a cancel | 200 CANCELLED; CANCELLED is terminal; an action edit or status change racing the cancel gets 409 TICKET_NOT_ACTIVE and changes nothing | server/tests/lab-04/ticket-workflow.api.test.ts | Planned |
 
 ## 4. API / Integration Tests — Dashboards
 
@@ -90,7 +90,7 @@ Planned before implementation (Spec DD → Test DD → TDD). Every AC in
 | MIG-02 | Migration | AC-20, spec §7.1 | `resolvedAt` backfill | Legacy RESOLVED/CLOSED ticket with null resolvedAt gets updatedAt; active tickets untouched; re-running is a no-op | server/tests/lab-04/migration.api.test.ts | Planned |
 | MIG-03 | Migration | AC-20 | Lab 1–3 data still valid | Users, Tickets, Attachments, Comments, Notes readable through their Lab 3 endpoints; legacy tickets have actionsTaken [] and statusHistory [] | server/tests/lab-04/migration.api.test.ts | Planned |
 | MIG-04 | Migration | §7.2 | Seed idempotency | Running the seed twice leaves every table count unchanged | server/tests/lab-04/migration.api.test.ts | Planned |
-| REG-01 | Regression | AC-21 | All Lab 1–3 server suites | Pass (only CHG-02 fixture change) | server/tests/lab-01/, server/tests/lab-02/, server/tests/lab-03/ | Planned |
+| REG-01 | Regression | AC-21 | All Lab 1–3 server suites | Pass (only the CHG-02 fixture change, incl. its teardown of fixture actions and history rows) | server/tests/lab-01/, server/tests/lab-02/, server/tests/lab-03/ | Planned |
 | REG-02 | Regression | AC-21 | All Lab 2–3 client suites | Pass | client/tests/lab-02/, client/tests/lab-03/ | Planned |
 | REG-03 | Regression | AC-21 | All Lab 2–3 Playwright specs | Pass; only CHG-01 changes: either the post-login landing-URL assertion is updated or exactly one navigation step (`page.goto` or a nav click) is added right after login; nothing else changes | e2e/lab-02/, e2e/lab-03/ | Planned |
 
@@ -196,6 +196,8 @@ npx tsx scripts/lab4-metrics-check.ts > artifacts/lab-04/metrics-check.txt
 loaded machine. It also sets `fileParallelism: false` (PR #69 review): the server
 files share one dev database and CPU-bound bcrypt, so they run one file at a time and
 `npx vitest run` is deterministic.
+The client Vitest config (`client/vite.config.ts`) sets `testTimeout: 15000` and
+`maxWorkers: 2` (Issue #62), so `cd client && npx vitest run` passes in one normal run.
 
 ## 14. Final Results
 

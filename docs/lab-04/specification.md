@@ -443,7 +443,19 @@ into `main`, `reviewer.md` and `ai-use.md` completed, submission PDF Answer Part
      reach the screen it tests. No other change to earlier tests is allowed.
    - **CHG-02** — the resolution gate means a Ticket cannot be resolved without
      recorded work. Lab 3 tests that resolve a Ticket now first create one COMPLETED
-     Action Taken in their fixture; their assertions are unchanged.
+     Action Taken in their fixture; their assertions are unchanged. Because the
+     status endpoint now writes `TicketStatusChange` rows (FK to the Ticket), those
+     tests' teardown also deletes the fixture actions and history rows before their
+     tickets; this teardown is part of the CHG-02 fixture change.
 8. **Administrator dashboard** reuses the IT Staff dashboard plus account counts,
    as allowed by the handout, instead of a third design.
 9. **Known Lab 3 schema drift, intentionally left untouched.** The Lab 3 hand-written migration left three `User` column defaults (`role`, `mustChangePassword`, `updatedAt`) and the `TicketComment`/`TicketInternalNote` foreign-key rules different from `schema.prisma`; fixing it would require a non-additive migration (`DROP DEFAULT`/`DROP CONSTRAINT`), so the Lab 4 migration is generated as a Lab 3 → Lab 4 schema diff and applied with `prisma migrate deploy`.
+10. **Contract amendments made with Issue #62 (stated in its PR):** api-spec §8 now
+   (a) evaluates the resolution gate inside the status transaction after locking the
+   ticket row (`FOR UPDATE`), while Action Taken writes take a share lock on the same
+   row and re-read the ticket status, so a resolve, cancel or close and a concurrent
+   action write are serialized; (b) adds `AND updatedAt = :expectedUpdatedAt` to the
+   conditional update when the token is sent; (c) defines the `current` body of the
+   ticket `STALE_UPDATE`; (d) states that `RESOLUTION_BLOCKED` blockers never contain
+   `UNASSIGNED` (that case is `UNASSIGNED_TICKET`); (e) treats `expectedUpdatedAt:
+   null` as not sent. These tighten BR-12 and BR-17; no rule is relaxed.

@@ -94,14 +94,29 @@ async function staleUpdate(res: Response, actionId: number) {
  * Conditional update on the updatedAt the client last saw (BR-17): if another
  * request changed the row in between, 0 rows match and nothing is written.
  */
-async function updateIfUnchanged(actionId: number, expected: Date, data: Prisma.ActionTakenUncheckedUpdateManyInput) {
-  const { count } = await prisma.actionTaken.updateMany({
-    where: { id: actionId, updatedAt: expected },
-    // Strictly later than the token, even within the same millisecond, so an
-    // old token can never match the new version.
-    data: { ...data, updatedAt: new Date(Math.max(Date.now(), expected.getTime() + 1)) },
-  });
-  return count === 1;
+/** Interactive transactions may wait on a ticket row lock; keep them well above Prisma's 5 s default. */
+export const LOCKING_TX_OPTIONS = { maxWait: 10_000, timeout: 15_000 };
+
+async function updateIfUnchanged(
+  ticketId: number,
+  actionId: number,
+  expected: Date,
+  data: Prisma.ActionTakenUncheckedUpdateManyInput
+): Promise<'updated' | 'stale' | 'inactive'> {
+  return prisma.$transaction(async (tx) => {
+    // Share-lock the ticket and re-read its status, so an edit cannot land on a
+    // ticket that a concurrent request has just made inactive (BR-10).
+    await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticketId} FOR SHARE`;
+    const ticket = await tx.ticket.findUniqueOrThrow({ where: { id: ticketId }, select: { currentStatus: true } });
+    if (!isActiveTicketStatus(ticket.currentStatus as TicketStatus)) return 'inactive';
+    const { count } = await tx.actionTaken.updateMany({
+      where: { id: actionId, updatedAt: expected },
+      // Strictly later than the token, even within the same millisecond, so an
+      // old token can never match the new version.
+      data: { ...data, updatedAt: new Date(Math.max(Date.now(), expected.getTime() + 1)) },
+    });
+    return count === 1 ? 'updated' : 'stale';
+  }, LOCKING_TX_OPTIONS);
 }
 
 type ActionTakenRow = NonNullable<Awaited<ReturnType<typeof findAction>>>;
@@ -193,22 +208,31 @@ router.post('/staff/tickets/:ticketNumber/actions', ...staffOnly, async (req: Re
     if (!(await isValidAssignee(performedById))) return invalidAssignee(res);
 
     try {
-      const created = await prisma.actionTaken.create({
-        data: {
-          ticketId: ticket.id,
-          createdById: req.user!.id,
-          performedById,
-          clientRequestId,
-          status: 'PLANNED',
-          actionAt: data.actionAt!,
-          description: data.description!,
-          result: data.result ?? null,
-          followUpRequired: data.followUpRequired ?? false,
-          followUpNote: data.followUpNote ?? null,
-          attachmentNotes: data.attachmentNotes ?? null,
-        },
-        include: ACTION_TAKEN_INCLUDE,
-      });
+      // Share-lock the ticket and re-read its status, so a concurrent resolve
+      // (which takes FOR UPDATE on the same row) either sees this action in its
+      // gate or has already committed and this create is refused (BR-10, BR-12).
+      const created = await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticket.id} FOR SHARE`;
+        const fresh = await tx.ticket.findUniqueOrThrow({ where: { id: ticket.id }, select: { currentStatus: true } });
+        if (!isActiveTicketStatus(fresh.currentStatus as TicketStatus)) return null;
+        return tx.actionTaken.create({
+          data: {
+            ticketId: ticket.id,
+            createdById: req.user!.id,
+            performedById,
+            clientRequestId,
+            status: 'PLANNED',
+            actionAt: data.actionAt!,
+            description: data.description!,
+            result: data.result ?? null,
+            followUpRequired: data.followUpRequired ?? false,
+            followUpNote: data.followUpNote ?? null,
+            attachmentNotes: data.attachmentNotes ?? null,
+          },
+          include: ACTION_TAKEN_INCLUDE,
+        });
+      }, LOCKING_TX_OPTIONS);
+      if (!created) return ticketNotActive(res);
       return res.status(201).json(toActionTaken(created));
     } catch (error) {
       // Two parallel requests with the same key: the unique index lets only
@@ -252,11 +276,12 @@ router.patch('/staff/tickets/:ticketNumber/actions/:actionId', ...staffOnly, asy
     const performedById = typeof body.performedById === 'number' ? body.performedById : undefined;
     if (performedById !== undefined && !(await isValidAssignee(performedById))) return invalidAssignee(res);
 
-    const updated = await updateIfUnchanged(action.id, expected, {
+    const outcome = await updateIfUnchanged(ticket.id, action.id, expected, {
       ...data,
       ...(performedById !== undefined ? { performedById } : {}),
     });
-    if (!updated) return staleUpdate(res, action.id);
+    if (outcome === 'inactive') return ticketNotActive(res);
+    if (outcome === 'stale') return staleUpdate(res, action.id);
 
     const fresh = await prisma.actionTaken.findUniqueOrThrow({ where: { id: action.id }, include: ACTION_TAKEN_INCLUDE });
     res.status(200).json(toActionTaken(fresh));
@@ -311,13 +336,14 @@ router.patch('/staff/tickets/:ticketNumber/actions/:actionId/status', ...staffOn
     }
 
     const now = new Date();
-    const updated = await updateIfUnchanged(action.id, expected, {
+    const outcome = await updateIfUnchanged(ticket.id, action.id, expected, {
       status: target,
       ...(suppliedResult !== undefined ? { result: suppliedResult } : {}),
       ...(target === 'COMPLETED' ? { completedAt: now } : {}),
       ...(target === 'CANCELLED' ? { cancelledAt: now } : {}),
     });
-    if (!updated) return staleUpdate(res, action.id);
+    if (outcome === 'inactive') return ticketNotActive(res);
+    if (outcome === 'stale') return staleUpdate(res, action.id);
 
     const fresh = await prisma.actionTaken.findUniqueOrThrow({ where: { id: action.id }, include: ACTION_TAKEN_INCLUDE });
     res.status(200).json(toActionTaken(fresh));
