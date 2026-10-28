@@ -5,6 +5,7 @@ import { requireAuth, requirePasswordChanged, requireRole } from '../middleware/
 import { normalizePagination, validateCommentContent } from '../utils/validation';
 import { isValidTransition } from '../utils/statusTransition';
 import type { TicketStatus } from '../utils/statusTransition';
+import { TICKET_HISTORY_INCLUDE, toActionTaken, toStatusChange } from '../utils/ticketHistory';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -166,6 +167,7 @@ router.get(
             orderBy: { createdAt: 'asc' },
             include: { author: { select: { id: true, name: true } } },
           },
+          ...TICKET_HISTORY_INCLUDE,
         },
       });
 
@@ -186,6 +188,7 @@ router.get(
         itPriority: ticket.itPriority,
         currentStatus: ticket.currentStatus,
         requesterIndicatedResolved: ticket.requesterIndicatedResolved,
+        resolvedAt: ticket.resolvedAt,
         createdAt: ticket.createdAt,
         updatedAt: ticket.updatedAt,
         attachments: ticket.attachments.map((a) => ({
@@ -214,6 +217,8 @@ router.get(
           content: n.content,
           createdAt: n.createdAt,
         })),
+        actionsTaken: ticket.actionsTaken.map(toActionTaken),
+        statusHistory: ticket.statusChanges.map(toStatusChange),
       });
     } catch (error) {
       console.error('Error fetching staff ticket detail:', error);

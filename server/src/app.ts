@@ -1,9 +1,11 @@
 import express from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import session from 'express-session';
 import healthRouter from './routes/health';
 import authRouter from './routes/auth';
 import staffTicketsRouter from './routes/staffTickets';
+import actionsTakenRouter from './routes/actionsTaken';
 import adminUsersRouter from './routes/adminUsers';
 import categoriesRouter from './routes/categories';
 import systemsRouter from './routes/relatedSystems';
@@ -41,10 +43,23 @@ app.use(
 app.use('/api', healthRouter);
 app.use('/api', authRouter);
 app.use('/api', staffTicketsRouter);
+app.use('/api', actionsTakenRouter);
 app.use('/api', adminUsersRouter);
 app.use('/api', categoriesRouter);
 app.use('/api', systemsRouter);
 app.use('/api', ticketsRouter);
 app.use('/api', attachmentsRouter);
+
+// Malformed JSON bodies and any other unhandled error: safe JSON, never the
+// default HTML page with a stack trace (Lab 4 FR-20).
+app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
+  if (res.headersSent) return next(err);
+  const type = (err as { type?: string })?.type;
+  if (type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'VALIDATION_ERROR', message: 'The request body is not valid JSON.' });
+  }
+  console.error('Unhandled error:', err);
+  return res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Something went wrong. Please try again.' });
+});
 
 export default app;
