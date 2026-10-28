@@ -458,4 +458,6 @@ into `main`, `reviewer.md` and `ai-use.md` completed, submission PDF Answer Part
    conditional update when the token is sent; (c) defines the `current` body of the
    ticket `STALE_UPDATE`; (d) states that `RESOLUTION_BLOCKED` blockers never contain
    `UNASSIGNED` (that case is `UNASSIGNED_TICKET`); (e) treats `expectedUpdatedAt:
-   null` as not sent. These tighten BR-12 and BR-17; no rule is relaxed.
+   null` as not sent; (f) inside that transaction checks, on the locked row, status and
+   token (`STALE_UPDATE`), then owner (`UNASSIGNED_TICKET`), then the gate. These
+   tighten BR-11, BR-12 and BR-17; no rule is relaxed.

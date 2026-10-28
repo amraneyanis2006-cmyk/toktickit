@@ -193,15 +193,20 @@ The UI initialises its `role` and `isActive` filters from the URL
 - **Processing order:** validate value → load ticket (404) → stale check (409
   `STALE_UPDATE`) → matrix (409 `INVALID_TRANSITION`) → owner check for
   RESOLVED/CLOSED (409 `UNASSIGNED_TICKET`) → **one transaction**: lock the ticket
-  row (`SELECT … FOR UPDATE`) → resolution gate for RESOLVED (409
-  `RESOLUTION_BLOCKED`) → conditional update
+  row (`SELECT … FOR UPDATE`) and re-read it → on the locked row: status and token
+  unchanged (else 409 `STALE_UPDATE`) → owner for RESOLVED/CLOSED (else 409
+  `UNASSIGNED_TICKET`) → resolution gate for RESOLVED (409 `RESOLUTION_BLOCKED`) →
+  conditional update
   `WHERE id = :id AND currentStatus = :readStatus` (plus `AND updatedAt =
   :expectedUpdatedAt` when the token is sent; 0 rows → 409 `STALE_UPDATE`),
   set/clear `resolvedAt`, clear `requesterIndicatedResolved` on REOPENED, insert
-  `TicketStatusChange`. `POST …/actions` takes a share lock on the same ticket row
-  and re-reads its status in its own transaction, so a concurrent resolve and action
-  create are serialized: either the gate sees the new open action or the create gets
-  `409 TICKET_NOT_ACTIVE`.
+  `TicketStatusChange` (the conditional update is defence in depth; the locked-row
+  re-check is what catches a concurrent change). Every Action Taken write
+  (`POST …/actions`, `PATCH …/actions/:actionId`, `PATCH …/actions/:actionId/status`)
+  takes a share lock on the same ticket row
+  and re-reads its status in its own transaction, so a concurrent status change and
+  action write are serialized: either the gate sees the new open action or the write
+  gets `409 TICKET_NOT_ACTIVE`.
 - **200**
 ```json
 {

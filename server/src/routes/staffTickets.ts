@@ -370,6 +370,13 @@ async function staleStatus(res: Response, ticketId: number) {
   });
 }
 
+function unassignedTicket(res: Response) {
+  return res.status(409).json({
+    error: 'UNASSIGNED_TICKET',
+    message: 'An unassigned ticket cannot be resolved or closed.',
+  });
+}
+
 const BLOCKER_MESSAGES: Record<string, string> = {
   NO_COMPLETED_ACTION: 'complete at least one action',
   OPEN_ACTIONS: 'complete or cancel the open actions',
@@ -420,12 +427,7 @@ router.patch(
         });
       }
 
-      if ((target === 'RESOLVED' || target === 'CLOSED') && ticket.ticketOwnerId === null) {
-        return res.status(409).json({
-          error: 'UNASSIGNED_TICKET',
-          message: 'An unassigned ticket cannot be resolved or closed.',
-        });
-      }
+      if ((target === 'RESOLVED' || target === 'CLOSED') && ticket.ticketOwnerId === null) return unassignedTicket(res);
 
       const result = await prisma.$transaction(async (tx) => {
         // Lock the ticket row: Action Taken writes take a share lock on it
@@ -445,7 +447,8 @@ router.patch(
           const actions = await tx.actionTaken.findMany({ where: { ticketId: ticket.id }, select: { status: true } });
           // The owner was checked just above, so UNASSIGNED cannot be among these blockers.
           const gate = computeResolutionGate(locked, actions);
-          if (!gate.canResolve) return { blocked: gate.blockers } as const;
+          const blockers = gate.blockers.filter((b): b is 'NO_COMPLETED_ACTION' | 'OPEN_ACTIONS' => b !== 'UNASSIGNED');
+          if (blockers.length > 0) return { blocked: blockers } as const;
         }
 
         const { count } = await tx.ticket.updateMany({
@@ -459,6 +462,8 @@ router.patch(
             ...(target === 'REOPENED' ? { resolvedAt: null, requesterIndicatedResolved: false } : {}),
           },
         });
+        // Defence in depth: the locked-row re-check above already catches a
+        // concurrent change, so this guard should never fire.
         if (count === 0) throw new StaleStatusError();
 
         const statusChange = await tx.ticketStatusChange.create({
@@ -469,12 +474,7 @@ router.patch(
         return { updated, statusChange } as const;
       }, LOCKING_TX_OPTIONS);
 
-      if ('unassigned' in result) {
-        return res.status(409).json({
-          error: 'UNASSIGNED_TICKET',
-          message: 'An unassigned ticket cannot be resolved or closed.',
-        });
-      }
+      if ('unassigned' in result) return unassignedTicket(res);
       if ('blocked' in result) {
         const parts = result.blocked.map((b) => BLOCKER_MESSAGES[b]).filter(Boolean);
         return res.status(409).json({

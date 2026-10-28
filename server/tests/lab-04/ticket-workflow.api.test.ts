@@ -218,6 +218,24 @@ describe('Resolution gate on PATCH /api/staff/tickets/:ticketNumber/status', () 
     expect(await historyCount(ticket.id)).toBe(0);
   });
 
+  it('WF-06: an owner removed while a close waits on the lock is 409 UNASSIGNED_TICKET; a legacy RESOLVED ticket without actions can be CLOSED', async () => {
+    const ticket = await createTicket(prisma, fx, { status: 'RESOLVED', resolvedAt: new Date() });
+    const res = await raceAgainst(
+      ticket.id,
+      'UPDATE',
+      (tx) => tx.ticket.update({ where: { id: ticket.id }, data: { ticketOwnerId: null } }),
+      () => changeStatus(ticket.ticketNumber, { currentStatus: 'CLOSED' })
+    );
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('UNASSIGNED_TICKET');
+
+    // spec sec 7.1.3: the gate applies only to new transitions into RESOLVED.
+    const legacy = await createTicket(prisma, fx, { status: 'RESOLVED', resolvedAt: new Date('2026-09-01T00:00:00.000Z') });
+    const closed = await changeStatus(legacy.ticketNumber, { currentStatus: 'CLOSED' });
+    expect(closed.status).toBe(200);
+    expect(closed.body.resolvedAt).toBe('2026-09-01T00:00:00.000Z');
+  });
+
   it('WF-03: resolving when the gate is met sets RESOLVED, resolvedAt, exactly one history row, and the api-spec sec 8 shape', async () => {
     const ticket = await resolvable();
     await addAction(ticket.id, 'CANCELLED');
@@ -323,6 +341,9 @@ describe('Stale and concurrent status changes (BR-17)', () => {
       expect(bad.body.fields.expectedUpdatedAt, JSON.stringify(token)).toBeDefined();
     }
 
+    // Validation comes before the lookup (api-spec sec 8 order): 400, not 404.
+    const unknown = await request(app).patch(statusUrl('TKT-NOPE-000000')).set('Cookie', staffCookie).send({ currentStatus: 'FOO' });
+    expect(unknown.status).toBe(400);
     for (const body of [{}, { currentStatus: 'FOO' }, { currentStatus: 42 }]) {
       const bad = await changeStatus(ticket.ticketNumber, body);
       expect(bad.status, JSON.stringify(body)).toBe(400);
@@ -367,8 +388,8 @@ describe('Stale and concurrent status changes (BR-17)', () => {
     expect(await historyCount(ticket.id)).toBe(0);
   });
 
-  // Outcome check under real parallelism; the 0-row conditional-update path itself is
-  // proven deterministically by the forced-race WF-05 tests above.
+  // Outcome check under real parallelism. The read-then-write race itself is proven
+  // deterministically by the forced-race WF-05 tests above (locked-row re-check).
   it('WF-05: two parallel transitions - exactly one succeeds and exactly one history row is written', async () => {
     for (const withToken of [false, true]) {
       const ticket = await resolvable();
@@ -477,6 +498,11 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
 
     const again = await request(app).get(`/api/tickets/${ticket.ticketNumber}`).set('Cookie', requesterCookie);
     expect(again.body.statusHistory).toEqual(own.body.statusHistory);
+
+    const resolvedTicket = await resolvable();
+    const resolvedRes = await changeStatus(resolvedTicket.ticketNumber, { currentStatus: 'RESOLVED' });
+    const requesterView = await request(app).get(`/api/tickets/${resolvedTicket.ticketNumber}`).set('Cookie', requesterCookie);
+    expect(requesterView.body.resolvedAt).toBe(resolvedRes.body.resolvedAt);
 
     // Unowned tickets report UNASSIGNED in the detail gate.
     const unowned = await createTicket(prisma, fx, { ownerId: null });
