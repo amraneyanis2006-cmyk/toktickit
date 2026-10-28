@@ -707,7 +707,7 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
       updatedAt: stays.updatedAt,
       cancelledAt: null,
     });
-  });
+  }, 30_000); // ~30 requests (neighbour, five source statuses, detail, late writes, walk)
 
   it('WF-09: a failure after the cascade rolls everything back - status, actions and history (BR-13, BR-16 same transaction)', async () => {
     const ticket = await createTicket(prisma, fx);

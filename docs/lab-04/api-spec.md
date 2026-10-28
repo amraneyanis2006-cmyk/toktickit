@@ -259,7 +259,8 @@ The UI initialises its `role` and `isActive` filters from the URL
 - **400 `VALIDATION_ERROR`** with `fields.currentStatus` (missing/unknown value) and/or
   `fields.expectedUpdatedAt` (all invalid fields at once) (sent but not an ISO-8601 date-time with a time zone).
 - **500 `INTERNAL_ERROR`** a lock wait longer than the 15 s transaction timeout
-  (known limitation).
+  (known limitation; a steady stream of share-locking action writes can delay a
+  status change this long, since Postgres may grant new share locks ahead of it).
 
 ## 9. GET /api/dashboard/requester 🔒R
 
