@@ -78,20 +78,26 @@ async function raceAgainst<T>(
   change: (tx: Prisma.TransactionClient) => Promise<unknown>,
   fire: () => PromiseLike<T>
 ): Promise<T> {
-  let pending!: Promise<T>;
-  await prisma.$transaction(
-    async (tx) => {
-      if (mode === 'UPDATE') await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticketId} FOR UPDATE`;
-      else await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticketId} FOR SHARE`;
-      const pidRows = await tx.$queryRaw<Array<{ pid: number }>>`SELECT pg_backend_pid() AS pid`;
-      const pid = pidRows[0]!.pid;
-      await change(tx);
-      pending = Promise.resolve(fire());
-      await waitForBlockedBy(pid);
-    },
-    { timeout: 15000 }
-  );
-  return pending;
+  let pending: Promise<T> | undefined;
+  try {
+    await prisma.$transaction(
+      async (tx) => {
+        if (mode === 'UPDATE') await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticketId} FOR UPDATE`;
+        else await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticketId} FOR SHARE`;
+        const pidRows = await tx.$queryRaw<Array<{ pid: number }>>`SELECT pg_backend_pid() AS pid`;
+        const pid = pidRows[0]!.pid;
+        await change(tx);
+        pending = Promise.resolve(fire());
+        await waitForBlockedBy(pid);
+      },
+      { timeout: 15000 }
+    );
+  } catch (error) {
+    // Never leave a fired request running after a failed race.
+    await pending?.catch(() => {});
+    throw error;
+  }
+  return pending!;
 }
 
 /**
@@ -344,6 +350,9 @@ describe('Stale and concurrent status changes (BR-17)', () => {
     // Validation comes before the lookup (api-spec sec 8 order): 400, not 404.
     const unknown = await request(app).patch(statusUrl('TKT-NOPE-000000')).set('Cookie', staffCookie).send({ currentStatus: 'FOO' });
     expect(unknown.status).toBe(400);
+    const notFound = await request(app).patch(statusUrl('TKT-NOPE-000000')).set('Cookie', staffCookie).send({ currentStatus: 'OPEN' });
+    expect(notFound.status).toBe(404);
+    expect(notFound.body.error).toBe('NOT_FOUND');
     for (const body of [{}, { currentStatus: 'FOO' }, { currentStatus: 42 }]) {
       const bad = await changeStatus(ticket.ticketNumber, body);
       expect(bad.status, JSON.stringify(body)).toBe(400);
@@ -359,7 +368,7 @@ describe('Stale and concurrent status changes (BR-17)', () => {
     expect((await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } })).currentStatus).toBe('WAITING_FOR_REQUESTER');
   });
 
-  it('WF-05: a status changed between the read and the write is 409 STALE_UPDATE (conditional update, 0 rows)', async () => {
+  it('WF-05: a status changed between the read and the write is 409 STALE_UPDATE (locked-row re-check)', async () => {
     const ticket = await resolvable();
     const res = await raceAgainst(
       ticket.id,
@@ -464,8 +473,8 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
     const late = await addAction(ticket.id, 'COMPLETED', 30);
     const early = await addAction(ticket.id, 'CANCELLED', 90);
     await prisma.ticketInternalNote.create({ data: { ticketId: ticket.id, authorId: fx.staffA.id, content: 'Staff-only note' } });
-    await changeStatus(ticket.ticketNumber, { currentStatus: 'WAITING_FOR_REQUESTER' });
-    await changeStatus(ticket.ticketNumber, { currentStatus: 'IN_PROGRESS' });
+    expect((await changeStatus(ticket.ticketNumber, { currentStatus: 'WAITING_FOR_REQUESTER' })).status).toBe(200);
+    expect((await changeStatus(ticket.ticketNumber, { currentStatus: 'IN_PROGRESS' })).status).toBe(200);
 
     const requesterCookie = await loginAs(fx.requesterA.email);
     const own = await request(app).get(`/api/tickets/${ticket.ticketNumber}`).set('Cookie', requesterCookie);
@@ -499,8 +508,10 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
     const again = await request(app).get(`/api/tickets/${ticket.ticketNumber}`).set('Cookie', requesterCookie);
     expect(again.body.statusHistory).toEqual(own.body.statusHistory);
 
-    const resolvedTicket = await resolvable();
+    const resolvedTicket = await createTicket(prisma, fx, { requesterId: fx.requesterA.id });
+    await addAction(resolvedTicket.id, 'COMPLETED');
     const resolvedRes = await changeStatus(resolvedTicket.ticketNumber, { currentStatus: 'RESOLVED' });
+    expect(resolvedRes.status).toBe(200);
     const requesterView = await request(app).get(`/api/tickets/${resolvedTicket.ticketNumber}`).set('Cookie', requesterCookie);
     expect(requesterView.body.resolvedAt).toBe(resolvedRes.body.resolvedAt);
 

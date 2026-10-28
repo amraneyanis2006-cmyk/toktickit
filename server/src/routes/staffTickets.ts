@@ -416,7 +416,7 @@ router.patch(
         return res.status(404).json({ error: 'NOT_FOUND', message: 'Ticket not found.' });
       }
 
-      if (expected && expected.getTime() !== ticket.updatedAt.getTime()) return staleStatus(res, ticket.id);
+      if (expected && expected.getTime() !== ticket.updatedAt.getTime()) return await staleStatus(res, ticket.id);
 
       const current = ticket.currentStatus as TicketStatus;
 
@@ -492,7 +492,7 @@ router.patch(
       if (error instanceof StaleStatusError) {
         try {
           const ticket = await prisma.ticket.findFirst({ where: { ticketNumber: req.params.ticketNumber as string } });
-          if (ticket) return staleStatus(res, ticket.id);
+          if (ticket) return await staleStatus(res, ticket.id);
         } catch (recoveryError) {
           console.error('Error loading the current ticket after a stale update:', recoveryError);
         }

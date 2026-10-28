@@ -49,7 +49,8 @@ beforeEach(async () => {
   });
   ticketId = ticket.id;
   // CHG-02 (Lab 4 spec sec 11.7): the resolution gate needs recorded work, so the
-  // fixture ticket carries one COMPLETED Action Taken. Assertions are unchanged.
+  // shared fixture ticket (used by the resolving tests) carries one COMPLETED
+  // Action Taken. Assertions are unchanged.
   await prisma.actionTaken.create({
     data: {
       ticketId,

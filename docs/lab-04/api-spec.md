@@ -50,6 +50,7 @@ endpoint uses)
 { "canResolve": false, "blockers": ["OPEN_ACTIONS"] }
 ```
 `blockers` ⊆ `["UNASSIGNED", "NO_COMPLETED_ACTION", "OPEN_ACTIONS"]`.
+It is meaningful only when `RESOLVED` is in `legalNextStatuses`; the UI combines both.
 
 **Active statuses** (used by filters and metrics):
 `NEW, OPEN, IN_PROGRESS, WAITING_FOR_REQUESTER, REOPENED`.
@@ -200,7 +201,7 @@ The UI initialises its `role` and `isActive` filters from the URL
   `WHERE id = :id AND currentStatus = :readStatus` (plus `AND updatedAt =
   :expectedUpdatedAt` when the token is sent; 0 rows → 409 `STALE_UPDATE`),
   set/clear `resolvedAt`, clear `requesterIndicatedResolved` on REOPENED, insert
-  `TicketStatusChange` (the conditional update is defence in depth; the locked-row
+  `TicketStatusChange` (the conditional update is untested defence in depth; the locked-row
   re-check is what catches a concurrent change). Every Action Taken write
   (`POST …/actions`, `PATCH …/actions/:actionId`, `PATCH …/actions/:actionId/status`)
   takes a share lock on the same ticket row

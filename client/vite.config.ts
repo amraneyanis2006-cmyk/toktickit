@@ -10,7 +10,7 @@ export default defineConfig({
     setupFiles: './src/setupTests.ts',
     // jsdom component tests time out at the 5 s default when every core runs a
     // worker on a laptop; a longer timeout and two workers make one normal run
-    // reliable (PR #69 / Issue #62 decision). Config only - no test edited.
+    // reliable (Issue #62). Config only - no test edited.
     testTimeout: 15000,
     maxWorkers: 2,
   },
