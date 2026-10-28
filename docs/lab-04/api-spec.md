@@ -142,7 +142,7 @@ the ticket row is share-locked before the action row is written (§8).
 - **404 `NOT_FOUND`** unknown ticket, or action not belonging to that ticket.
 - **409 `STALE_UPDATE`** `expectedUpdatedAt` ≠ stored `updatedAt`; body includes
   `"current": ActionTaken` so the client can refresh (BR-17).
-- **409 `ACTION_LOCKED`** action is COMPLETED or CANCELLED (BR-09).
+- **409 `ACTION_LOCKED`** action is COMPLETED or CANCELLED (BR-09) - active ticket only; on an inactive ticket `TICKET_NOT_ACTIVE` is answered instead.
 - **409 `TICKET_NOT_ACTIVE`** (BR-10; re-checked on the share-locked ticket row, §8).
 - **422 `INVALID_ASSIGNEE`** (BR-05).
 
@@ -158,7 +158,7 @@ Check order after validation: `TICKET_NOT_ACTIVE` → `ACTION_LOCKED` → `STALE
 - **400 `VALIDATION_ERROR`** invalid `status` value; `fields.result` when completing
   without a Result; `expectedUpdatedAt` missing.
 - **409 `ACTION_LOCKED`** the action is COMPLETED or CANCELLED (checked before the
-  transition rule, BR-09).
+  transition rule, BR-09) - active ticket only; on an inactive ticket `TICKET_NOT_ACTIVE` is answered instead.
 - **409 `INVALID_ACTION_TRANSITION`** a move between open states not allowed by BR-08
   (e.g. IN_PROGRESS → PLANNED, PLANNED → PLANNED).
 - **409 `STALE_UPDATE`** (with `current`), **409 `TICKET_NOT_ACTIVE`** (re-checked on the

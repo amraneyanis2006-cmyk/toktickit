@@ -61,6 +61,7 @@ async function resolvable(opts: { status?: TicketStatus } = {}) {
 const historyCount = (ticketId: number) => prisma.ticketStatusChange.count({ where: { ticketId } });
 
 beforeAll(async () => {
+  await dropFaultInjection();
   fx = await createFixture(prisma, PREFIX);
   staffCookie = await loginAs(fx.staffA.email);
   staffBCookie = await loginAs(fx.staffB.email);
@@ -118,7 +119,19 @@ async function waitForBlockedBy(holderPid: number) {
   }
 }
 
+/** Removes fault-injection triggers/functions an interrupted run may have left behind. */
+async function dropFaultInjection() {
+  const fns = await prisma.$queryRaw<Array<{ name: string }>>`
+    SELECT proname AS name FROM pg_proc WHERE proname LIKE 'l4wf_fail_history_%'`;
+  for (const { name } of fns) {
+    if (!/^l4wf_fail_history_\d+$/.test(name)) continue;
+    await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS ${name} ON "TicketStatusChange"`);
+    await prisma.$executeRawUnsafe(`DROP FUNCTION IF EXISTS ${name}()`);
+  }
+}
+
 afterAll(async () => {
+  await dropFaultInjection();
   await cleanupPrefix(prisma, PREFIX);
   await prisma.$disconnect();
 });
@@ -667,7 +680,9 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
     // ticket only, i.e. after the status update and the action cascade ran in the tx.
     const fn = `l4wf_fail_history_${ticket.id}`;
     await prisma.$executeRawUnsafe(
-      `CREATE FUNCTION ${fn}() RETURNS trigger AS $$ BEGIN IF NEW."ticketId" = ${ticket.id} THEN RAISE EXCEPTION 'injected failure'; END IF; RETURN NEW; END $$ LANGUAGE plpgsql`
+      // Raises only if the cascade already ran in this transaction, so a missing or
+      // reordered cascade lets the insert succeed and the 500 assertion fails.
+      `CREATE FUNCTION ${fn}() RETURNS trigger AS $$ BEGIN IF NEW."ticketId" = ${ticket.id} AND EXISTS (SELECT 1 FROM "ActionTaken" WHERE "ticketId" = NEW."ticketId" AND status = 'CANCELLED' AND "cancelledAt" IS NOT NULL) THEN RAISE EXCEPTION 'injected failure'; END IF; RETURN NEW; END $$ LANGUAGE plpgsql`
     );
     try {
       await prisma.$executeRawUnsafe(`CREATE TRIGGER ${fn} BEFORE INSERT ON "TicketStatusChange" FOR EACH ROW EXECUTE FUNCTION ${fn}()`);
@@ -706,6 +721,9 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
     const row = await prisma.actionTaken.findUniqueOrThrow({ where: { id: created.id } });
     expect(row.status).toBe('CANCELLED');
     expect(row.cancelledAt!.toISOString()).toBe(res.body.statusChange.changedAt);
+    // The change time is taken after the lock, so it is never before the action that committed meanwhile.
+    expect(row.cancelledAt!.getTime()).toBeGreaterThanOrEqual(row.createdAt.getTime());
+    expect(row.updatedAt.getTime()).toBeGreaterThanOrEqual(row.createdAt.getTime());
     expect(await prisma.actionTaken.count({ where: { ticketId: ticket.id, status: { in: ['PLANNED', 'IN_PROGRESS'] } } })).toBe(0);
   });
 
@@ -717,10 +735,16 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
       const token = done.updatedAt.toISOString();
       const edit = await request(app).patch(url).set('Cookie', staffCookie).send({ expectedUpdatedAt: token, description: 'x' });
       const move = await request(app).patch(`${url}/status`).set('Cookie', staffCookie).send({ status: 'CANCELLED', expectedUpdatedAt: token });
-      for (const r of [edit, move]) {
+      const stale = await request(app).patch(url).set('Cookie', staffCookie).send({ expectedUpdatedAt: '2020-01-01T00:00:00.000Z', description: 'x' });
+      for (const r of [edit, move, stale]) {
         expect(r.status, status).toBe(409);
         expect(r.body.error, status).toBe('TICKET_NOT_ACTIVE');
       }
+      expect(await prisma.actionTaken.findUniqueOrThrow({ where: { id: done.id } })).toMatchObject({
+        status: 'COMPLETED',
+        description: done.description,
+        updatedAt: done.updatedAt,
+      });
     }
   });
 
@@ -733,6 +757,10 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
     const replay = await request(app).post(`/api/staff/tickets/${ticket.ticketNumber}/actions`).set('Cookie', staffCookie).send(body);
     expect(replay.status).toBe(200);
     expect(replay.body).toMatchObject({ id: first.body.id, status: 'CANCELLED' });
+    // The idempotency rules are answered before TICKET_NOT_ACTIVE, also for a reused key.
+    const reused = await request(app).post(`/api/staff/tickets/${ticket.ticketNumber}/actions`).set('Cookie', staffCookie).send({ ...body, description: 'Different' });
+    expect(reused.status).toBe(409);
+    expect(reused.body.error).toBe('IDEMPOTENCY_KEY_REUSED');
     expect(await prisma.actionTaken.count({ where: { ticketId: ticket.id } })).toBe(1);
   });
 
