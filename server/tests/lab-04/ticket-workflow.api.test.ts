@@ -598,19 +598,27 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
       const ticket = await createTicket(prisma, fx);
       const action = await addAction(ticket.id, 'PLANNED');
       const url = `/api/staff/tickets/${ticket.ticketNumber}/actions/${action.id}${route === 'status' ? '/status' : ''}`;
+      const cascadeAt = new Date(Date.now() + 1000);
       const body = route === 'status'
         ? { status: 'IN_PROGRESS', expectedUpdatedAt: action.updatedAt.toISOString() }
         : { description: 'Edited during a cancel', expectedUpdatedAt: action.updatedAt.toISOString() };
       const res = await raceAgainst(
         ticket.id,
         'UPDATE',
-        (tx) => tx.ticket.update({ where: { id: ticket.id }, data: { currentStatus: 'CANCELLED' } }),
+        // Same writes as the real cancel: ticket CANCELLED and the cascade on its open actions.
+        async (tx) => {
+          await tx.ticket.update({ where: { id: ticket.id }, data: { currentStatus: 'CANCELLED' } });
+          await tx.actionTaken.update({ where: { id: action.id }, data: { status: 'CANCELLED', cancelledAt: cascadeAt, updatedAt: cascadeAt } });
+        },
         () => request(app).patch(url).set('Cookie', staffCookie).send(body)
       );
+      // The write passed its pre-checks (open action, fresh token) before blocking; after the
+      // cancel it must answer TICKET_NOT_ACTIVE, not ACTION_LOCKED or STALE_UPDATE.
       expect(res.status, route).toBe(409);
       expect(res.body.error, route).toBe('TICKET_NOT_ACTIVE');
       const row = await prisma.actionTaken.findUniqueOrThrow({ where: { id: action.id } });
-      expect(row.updatedAt.toISOString(), route).toBe(action.updatedAt.toISOString());
+      expect(row.status, route).toBe('CANCELLED');
+      expect(row.updatedAt.toISOString(), route).toBe(cascadeAt.toISOString());
     }
   });
 
@@ -635,6 +643,14 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
     }
     expect(byId.get(done.id)).toMatchObject({ status: 'COMPLETED', updatedAt: done.updatedAt, cancelledAt: null });
     expect(byId.get(dropped.id)).toMatchObject({ status: 'CANCELLED', updatedAt: dropped.updatedAt, cancelledAt: dropped.cancelledAt });
+
+    // The cascade applies from every status that can move to CANCELLED.
+    for (const from of ['NEW', 'OPEN', 'WAITING_FOR_REQUESTER', 'REOPENED'] as const) {
+      const t = await createTicket(prisma, fx, { status: from });
+      const a = await addAction(t.id, 'PLANNED');
+      expect((await changeStatus(t.ticketNumber, { currentStatus: 'CANCELLED' })).status, from).toBe(200);
+      expect((await prisma.actionTaken.findUniqueOrThrow({ where: { id: a.id } })).status, from).toBe('CANCELLED');
+    }
 
     // The serialized detail shows the cascade (staff and Requester).
     const staffDetail = await request(app).get(`/api/staff/tickets/${ticket.ticketNumber}`).set('Cookie', staffCookie);
@@ -721,22 +737,23 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
     const row = await prisma.actionTaken.findUniqueOrThrow({ where: { id: created.id } });
     expect(row.status).toBe('CANCELLED');
     expect(row.cancelledAt!.toISOString()).toBe(res.body.statusChange.changedAt);
-    // The change time is taken after the lock, so it is never before the action that committed meanwhile.
+    // Sanity check: the cascade timestamp is not before the action that committed meanwhile.
     expect(row.cancelledAt!.getTime()).toBeGreaterThanOrEqual(row.createdAt.getTime());
     expect(row.updatedAt.getTime()).toBeGreaterThanOrEqual(row.createdAt.getTime());
     expect(await prisma.actionTaken.count({ where: { ticketId: ticket.id, status: { in: ['PLANNED', 'IN_PROGRESS'] } } })).toBe(0);
   });
 
-  it('WF-09: on a RESOLVED or CLOSED ticket, writes to a finished action are TICKET_NOT_ACTIVE (BR-10 before BR-09)', async () => {
-    for (const status of ['RESOLVED', 'CLOSED'] as const) {
-      const ticket = await createTicket(prisma, fx, { status, resolvedAt: new Date() });
+  it('WF-09: on a RESOLVED, CLOSED or CANCELLED ticket, writes to a finished action are TICKET_NOT_ACTIVE (BR-10 before BR-09)', async () => {
+    for (const status of ['RESOLVED', 'CLOSED', 'CANCELLED'] as const) {
+      const ticket = await createTicket(prisma, fx, { status, resolvedAt: status === 'CANCELLED' ? null : new Date() });
       const done = await addAction(ticket.id, 'COMPLETED');
       const url = `/api/staff/tickets/${ticket.ticketNumber}/actions/${done.id}`;
       const token = done.updatedAt.toISOString();
       const edit = await request(app).patch(url).set('Cookie', staffCookie).send({ expectedUpdatedAt: token, description: 'x' });
       const move = await request(app).patch(`${url}/status`).set('Cookie', staffCookie).send({ status: 'CANCELLED', expectedUpdatedAt: token });
       const stale = await request(app).patch(url).set('Cookie', staffCookie).send({ expectedUpdatedAt: '2020-01-01T00:00:00.000Z', description: 'x' });
-      for (const r of [edit, move, stale]) {
+      const staleMove = await request(app).patch(`${url}/status`).set('Cookie', staffCookie).send({ status: 'CANCELLED', expectedUpdatedAt: '2020-01-01T00:00:00.000Z' });
+      for (const r of [edit, move, stale, staleMove]) {
         expect(r.status, status).toBe(409);
         expect(r.body.error, status).toBe('TICKET_NOT_ACTIVE');
       }
@@ -757,10 +774,15 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
     const replay = await request(app).post(`/api/staff/tickets/${ticket.ticketNumber}/actions`).set('Cookie', staffCookie).send(body);
     expect(replay.status).toBe(200);
     expect(replay.body).toMatchObject({ id: first.body.id, status: 'CANCELLED' });
+    const afterCancel = await prisma.actionTaken.findUniqueOrThrow({ where: { id: first.body.id } });
+    expect(replay.body.updatedAt).toBe(afterCancel.updatedAt.toISOString());
+    expect(replay.body.cancelledAt).toBe(afterCancel.cancelledAt!.toISOString());
     // The idempotency rules are answered before TICKET_NOT_ACTIVE, also for a reused key.
     const reused = await request(app).post(`/api/staff/tickets/${ticket.ticketNumber}/actions`).set('Cookie', staffCookie).send({ ...body, description: 'Different' });
     expect(reused.status).toBe(409);
     expect(reused.body.error).toBe('IDEMPOTENCY_KEY_REUSED');
+    expect(reused.body.current).toMatchObject({ id: first.body.id, status: 'CANCELLED' });
+    expect((await prisma.actionTaken.findUniqueOrThrow({ where: { id: first.body.id } })).updatedAt).toEqual(afterCancel.updatedAt);
     expect(await prisma.actionTaken.count({ where: { ticketId: ticket.id } })).toBe(1);
   });
 

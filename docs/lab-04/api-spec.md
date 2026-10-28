@@ -101,7 +101,9 @@ an empty key (Lab 3 AC-09). Another Requester's Ticket → `404 NOT_FOUND`.
 - **200** → the existing `ActionTaken`, unchanged, when the same `clientRequestId` was
   already used on this Ticket **with the same payload** (idempotent replay, BR-18). The
   replay is answered before the `TICKET_NOT_ACTIVE` check and returns the action in its
-  current state (e.g. CANCELLED after a ticket-cancel cascade).
+  current state (e.g. CANCELLED after a ticket-cancel cascade). Check order: validation
+  (400) → ticket (404) → replay (200) / `IDEMPOTENCY_KEY_REUSED` → `TICKET_NOT_ACTIVE` →
+  `INVALID_ASSIGNEE` → create (the active status is re-checked on the share-locked row).
 - **409 `IDEMPOTENCY_KEY_REUSED`** the same `clientRequestId` was already used on this
   Ticket with a **different** payload (any of `actionAt`, `description`, `result`,
   `followUpRequired`, `followUpNote`, `attachmentNotes`, `performedById`, compared after
@@ -149,7 +151,8 @@ the ticket row is share-locked before the action row is written (§8).
 ## 6. PATCH /api/staff/tickets/:ticketNumber/actions/:actionId/status 🔒S
 
 Check order after validation: `TICKET_NOT_ACTIVE` → `ACTION_LOCKED` → `STALE_UPDATE` →
-`INVALID_ACTION_TRANSITION` → Result required for COMPLETED.
+`INVALID_ACTION_TRANSITION` → Result required for COMPLETED (the `400 fields.result` comes
+last because it depends on the stored Result).
 
 - **Request** `{ "status": "COMPLETED", "result": "Fixed after reboot.", "expectedUpdatedAt": "…" }`
   (`result` optional if already stored; required for COMPLETED when the stored result
@@ -215,8 +218,9 @@ The UI initialises its `role` and `isActive` filters from the URL
   = the change time, BR-13), insert `TicketStatusChange` (the conditional update is defence in depth behind the
   locked-row re-check). Every Action Taken write
   (`POST …/actions`, `PATCH …/actions/:actionId`, `PATCH …/actions/:actionId/status`)
-  takes a share lock on the same ticket row (always the ticket row first, then the
-  action rows, in every transaction, so the cancel cascade cannot deadlock)
+  takes a share lock on the same ticket row (design rule: every transaction that
+  writes Action Taken rows locks the ticket row first, which keeps the cancel cascade
+  free of lock-order deadlocks)
   and re-reads its status in its own transaction, so a concurrent status change and
   action write are serialized: either the gate sees the new open action or the write
   gets `409 TICKET_NOT_ACTIVE`.

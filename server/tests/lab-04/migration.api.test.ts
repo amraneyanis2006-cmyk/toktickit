@@ -171,6 +171,11 @@ describe('Lab 4 migration', () => {
       where: { status: { in: ['PLANNED', 'IN_PROGRESS'] }, ticket: { ...seedTickets, currentStatus: { in: ['RESOLVED', 'CLOSED', 'CANCELLED'] } } },
     });
     expect(openOnInactive).toBe(0);
+    // Not trivially true: some inactive seed tickets do carry (finished) actions.
+    const actionsOnInactive = await prisma.actionTaken.count({
+      where: { ticket: { ...seedTickets, currentStatus: { in: ['RESOLVED', 'CLOSED', 'CANCELLED'] } } },
+    });
+    expect(actionsOnInactive).toBeGreaterThan(0);
     for (const t of lab4) expect(t.ticketNumber).toMatch(/^TKT-\d{4}-\d{6}$/);
   }, 180_000);
 });

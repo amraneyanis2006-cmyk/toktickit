@@ -382,7 +382,7 @@ There is **no** DELETE endpoint for Actions Taken, Status History, Comments, or 
 | AC-03 | Given an Action Taken being created or assigned to an inactive user or to a Requester, when it is submitted, then it is rejected with `422 INVALID_ASSIGNEE` and nothing is saved. |
 | AC-04 | Given Follow-Up Required is checked and the Follow-up Note is empty, when the action is saved, then it is rejected with a field-level validation error and nothing is saved. |
 | AC-05 | Given a Requester session, when any Action Taken create/update/status endpoint is called directly, then it is rejected with `403`; the Requester sees the Actions Taken of their own Ticket read-only and gets `404` for another Requester's Ticket. |
-| AC-06 | Given an open Action Taken, when it is completed without a Result, then it is rejected; with a Result it becomes COMPLETED with `completedAt`, and any later edit is rejected with `409 ACTION_LOCKED`. |
+| AC-06 | Given an open Action Taken, when it is completed without a Result, then it is rejected; with a Result it becomes COMPLETED with `completedAt`, and any later edit while the Ticket is active is rejected with `409 ACTION_LOCKED` (`409 TICKET_NOT_ACTIVE` once the Ticket is inactive, BR-10). |
 | AC-07 | Given an open Action Taken, when it is cancelled after confirmation, then it becomes CANCELLED, stays visible in the list, and cannot be edited. |
 | AC-08 | Given a Ticket with no COMPLETED Action Taken or with an open Action Taken, when a transition to RESOLVED is requested (including directly through the API), then it is rejected with `409 RESOLUTION_BLOCKED` listing the blockers and the status is unchanged. |
 | AC-09 | Given an owned Ticket with at least one COMPLETED and no open Action Taken, when IT Staff resolve it, then the status becomes RESOLVED, `resolvedAt` is set, one Status History entry is appended, and the Ticket summary refreshes. |
@@ -478,6 +478,7 @@ into `main`, `reviewer.md` and `ai-use.md` completed, submission PDF Answer Part
    (k) owner decision on PR #70: cancelling a Ticket also cancels its open Actions Taken
    in the status transaction (BR-13, cross-referenced from BR-08), so no action stays
    open on a ticket where BR-10 forbids further action writes; action writes on an
-   inactive ticket answer `TICKET_NOT_ACTIVE` before `ACTION_LOCKED`/`STALE_UPDATE`.
+   inactive ticket answer `TICKET_NOT_ACTIVE` before `ACTION_LOCKED`/`STALE_UPDATE`
+   (AC-06 qualified accordingly).
    These tighten BR-10, BR-12, BR-13 and BR-17, and on inactive tickets give BR-10
    `TICKET_NOT_ACTIVE` precedence over BR-08/BR-09 `ACTION_LOCKED`; no rule is relaxed.
