@@ -13,7 +13,6 @@ import {
   SEED_CATEGORY_NAMES,
   SEED_SYSTEM_NAMES,
   LEGACY_SEED_TICKET_NUMBERS,
-  LAB4_SEED_TICKET_PREFIX,
   SEED_ACTION_KEY_PREFIX,
 } from '../../../prisma/seedData';
 
@@ -133,8 +132,13 @@ describe('Lab 4 migration', () => {
     const runSeed = () =>
       execFileSync(path.join(ROOT, 'node_modules/.bin/tsx'), ['prisma/seed.ts'], { cwd: ROOT, stdio: 'pipe' });
 
+    // Lab 4 seed tickets have ordinary sequence numbers; they are the tickets
+    // that carry seed-keyed Actions Taken.
     const seedTickets = {
-      OR: [{ ticketNumber: { in: LEGACY_SEED_TICKET_NUMBERS } }, { ticketNumber: { startsWith: LAB4_SEED_TICKET_PREFIX } }],
+      OR: [
+        { ticketNumber: { in: LEGACY_SEED_TICKET_NUMBERS } },
+        { actionsTaken: { some: { clientRequestId: { startsWith: SEED_ACTION_KEY_PREFIX } } } },
+      ],
     };
     const counts = async () => ({
       users: await prisma.user.count({ where: { email: { in: SEED_ACCOUNT_EMAILS } } }),
@@ -156,5 +160,12 @@ describe('Lab 4 migration', () => {
     expect(first.users).toBe(SEED_ACCOUNT_EMAILS.length);
     expect(first.actions).toBeGreaterThanOrEqual(8);
     expect(first.statusChanges).toBeGreaterThan(0);
+    // Lab 4 seed tickets use the normal TKT-YYYY-NNNNNN format of the live sequence.
+    const lab4 = await prisma.ticket.findMany({
+      where: { actionsTaken: { some: { clientRequestId: { startsWith: SEED_ACTION_KEY_PREFIX } } } },
+      select: { ticketNumber: true },
+    });
+    expect(lab4.length).toBeGreaterThanOrEqual(6);
+    for (const t of lab4) expect(t.ticketNumber).toMatch(/^TKT-\d{4}-\d{6}$/);
   }, 180_000);
 });

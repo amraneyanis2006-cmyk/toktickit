@@ -48,11 +48,12 @@ export const LEGACY_SEED_TICKET_NUMBERS = Array.from(
 );
 
 /**
- * Lab 4 seed tickets get their own number range, outside the live
- * TKT-2026-NNNNNN sequence, so seeding never collides with (or attaches
- * actions to) Tickets created through the app.
+ * Lab 4 seed tickets use normal TKT-YYYY-NNNNNN numbers from the live ticket
+ * sequence; they are found again through their Actions Taken, keyed
+ * seed-<seed key>-<n> (stable seed key, not the ticket number).
  */
-export const LAB4_SEED_TICKET_PREFIX = "TKT-2026-L4-";
-
-/** Actions Taken are keyed seed-<ticketNumber>-<n> and upserted on [ticketId, clientRequestId]. */
 export const SEED_ACTION_KEY_PREFIX = "seed-";
+
+export function seedActionKey(seedKey: string, n: number): string {
+  return `${SEED_ACTION_KEY_PREFIX}${seedKey}-${n}`;
+}

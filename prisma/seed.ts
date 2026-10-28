@@ -6,6 +6,7 @@
 
 import { PrismaClient, Role, Priority, TicketStatus, ActionStatus } from "@prisma/client";
 import * as bcrypt from "bcrypt";
+import { generateTicketNumber } from "../server/src/utils/ticketNumber";
 import {
   SEED_REQUESTERS,
   SEED_EMPTY_REQUESTER,
@@ -13,8 +14,8 @@ import {
   SEED_ADMIN,
   SEED_CATEGORY_NAMES,
   SEED_SYSTEM_NAMES,
-  LAB4_SEED_TICKET_PREFIX,
   SEED_ACTION_KEY_PREFIX,
+  seedActionKey,
 } from "./seedData";
 
 const prisma = new PrismaClient();
@@ -176,16 +177,20 @@ async function main() {
   console.log(`  Requesters: ${requesters.length} active (already-migrated Lab 2 accounts left untouched, or freshly seeded as fallback on a clean database)`);
   console.log(`  IT Staff:   ${staff.length} (1 inactive)`);
   console.log(`  Admin:      1 (${admin.email})`);
-  console.log(`  Lab 4:      ${lab4.tickets} tickets ${LAB4_SEED_TICKET_PREFIX}*, ${lab4.actions} Actions Taken; ${lab4.emptyRequester} has no ticket`);
+  console.log(`  Lab 4:      ${lab4.tickets} tickets (${lab4.created} created this run), ${lab4.actions} Actions Taken; ${lab4.emptyRequester} has no ticket`);
   console.log(`  All seeded accounts use password: ${SEED_PASSWORD} (local dev only)`);
 }
 
 // --------------------------------------------------------------------------
 // Lab 4 seed data (docs/lab-04/specification.md sec 7.2).
-// Every Lab 4 ticket has its own stable number (TKT-2026-L4-NNN) and is created
-// once, together with its Status History, in one transaction; every Action
-// Taken is upserted on [ticketId, clientRequestId = seed-<ticketNumber>-<n>],
-// so a re-run changes nothing. Dates are relative to the first run.
+// Lab 4 tickets get normal TKT-YYYY-NNNNNN numbers from the live ticket
+// sequence (generateTicketNumber, as POST /api/tickets). Each has a stable
+// seed key and at least one Action Taken keyed seed-<key>-<n>: a re-run finds
+// the ticket again through its first action key and creates nothing. The
+// ticket, its actions and its Status History are written in ONE nested create,
+// so a crash can never leave a ticket that the next run would not recognise.
+// Zero-action tickets are the legacy seed tickets above (no Lab 4 actions).
+// Dates are relative to the first run.
 // --------------------------------------------------------------------------
 type SeedUser = { id: number };
 type SeedRef = { id: number };
@@ -205,7 +210,7 @@ interface Lab4ActionSeed {
 }
 
 interface Lab4TicketSeed {
-  n: number;
+  key: string; // stable seed key, never shown in the app
   requester: SeedUser;
   owner: SeedUser | null;
   status: TicketStatus;
@@ -234,15 +239,15 @@ async function seedLab4(ctx: {
     create: { ...SEED_EMPTY_REQUESTER, role: Role.REQUESTER, passwordHash, mustChangePassword: false },
   });
 
-  const [jennifer, michael, sarah, david] = ctx.requesters;
+  const [jennifer, michael, , david] = ctx.requesters;
   // Somsak (staff[2]) only has COMPLETED actions: the "no open action" staff dashboard.
   const [alex, priya, somsak] = ctx.staff;
-  const { access, hardware, software, network } = ctx.categories;
+  const { access, software, network } = ctx.categories;
   const { laptop, wifi, email, vpn } = ctx.systems;
 
   const tickets: Lab4TicketSeed[] = [
     {
-      n: 1, requester: jennifer, owner: alex, status: TicketStatus.IN_PROGRESS, reqP: Priority.HIGH, itP: Priority.HIGH,
+      key: "wifi-certificate", requester: jennifer, owner: alex, status: TicketStatus.IN_PROGRESS, reqP: Priority.HIGH, itP: Priority.HIGH,
       category: network, system: wifi, summary: "Wi-Fi certificate expired on several lab laptops", createdAgo: 3 * DAY,
       history: [{ from: TicketStatus.NEW, to: TicketStatus.IN_PROGRESS, ago: 3 * DAY - 2 * HOUR, by: alex }],
       actions: [
@@ -255,7 +260,7 @@ async function seedLab4(ctx: {
       ],
     },
     {
-      n: 2, requester: michael, owner: priya, status: TicketStatus.OPEN, reqP: Priority.MEDIUM, itP: Priority.MEDIUM,
+      key: "stats-licence", requester: michael, owner: priya, status: TicketStatus.OPEN, reqP: Priority.MEDIUM, itP: Priority.MEDIUM,
       category: software, system: laptop, summary: "Statistics software asks for a licence again", createdAgo: 2 * DAY,
       history: [{ from: TicketStatus.NEW, to: TicketStatus.OPEN, ago: 2 * DAY - HOUR, by: priya }],
       actions: [
@@ -264,12 +269,7 @@ async function seedLab4(ctx: {
       ],
     },
     {
-      n: 3, requester: sarah, owner: null, status: TicketStatus.NEW, reqP: Priority.LOW, itP: null,
-      category: hardware, system: laptop, summary: "External monitor flickers when docked", createdAgo: 6 * HOUR,
-      history: [], actions: [],
-    },
-    {
-      n: 4, requester: david, owner: alex, status: TicketStatus.RESOLVED, reqP: Priority.HIGH, itP: Priority.HIGH,
+      key: "shared-mailbox", requester: david, owner: alex, status: TicketStatus.RESOLVED, reqP: Priority.HIGH, itP: Priority.HIGH,
       category: access, system: email, summary: "Shared mailbox not visible after migration", createdAgo: 5 * DAY, resolvedAgo: 2 * DAY,
       history: [
         { from: TicketStatus.NEW, to: TicketStatus.IN_PROGRESS, ago: 4 * DAY, by: alex },
@@ -283,7 +283,7 @@ async function seedLab4(ctx: {
       ],
     },
     {
-      n: 5, requester: jennifer, owner: somsak, status: TicketStatus.CLOSED, reqP: Priority.LOW, itP: Priority.LOW,
+      key: "vpn-client", requester: jennifer, owner: somsak, status: TicketStatus.CLOSED, reqP: Priority.LOW, itP: Priority.LOW,
       category: network, system: vpn, summary: "VPN client update needed", createdAgo: 25 * DAY, resolvedAgo: 20 * DAY,
       history: [
         { from: TicketStatus.NEW, to: TicketStatus.IN_PROGRESS, ago: 24 * DAY, by: somsak },
@@ -296,7 +296,7 @@ async function seedLab4(ctx: {
       ],
     },
     {
-      n: 6, requester: jennifer, owner: priya, status: TicketStatus.WAITING_FOR_REQUESTER, reqP: Priority.MEDIUM, itP: Priority.LOW,
+      key: "printer-driver", requester: jennifer, owner: priya, status: TicketStatus.WAITING_FOR_REQUESTER, reqP: Priority.MEDIUM, itP: Priority.LOW,
       category: software, system: laptop, summary: "Printer driver missing after OS update", createdAgo: 4 * DAY,
       requesterIndicatedResolved: true,
       history: [
@@ -309,74 +309,75 @@ async function seedLab4(ctx: {
       ],
     },
     {
-      n: 7, requester: jennifer, owner: alex, status: TicketStatus.WAITING_FOR_REQUESTER, reqP: Priority.HIGH, itP: Priority.HIGH,
+      key: "two-factor", requester: jennifer, owner: alex, status: TicketStatus.WAITING_FOR_REQUESTER, reqP: Priority.HIGH, itP: Priority.HIGH,
       category: access, system: email, summary: "Two-factor prompt never arrives", createdAgo: 2 * DAY,
       history: [{ from: TicketStatus.NEW, to: TicketStatus.WAITING_FOR_REQUESTER, ago: 1 * DAY, by: alex }],
-      actions: [],
+      actions: [
+        { at: -1 * DAY - 2 * HOUR, description: "Re-sent the two-factor enrolment link to the requester.", status: ActionStatus.COMPLETED,
+          performedBy: alex, createdBy: alex, result: "Link sent; waiting for the requester to confirm the prompt arrives." },
+      ],
     },
   ];
 
   const now = Date.now();
   let actionCount = 0;
+  let created = 0;
 
   for (const t of tickets) {
-    const ticketNumber = `${LAB4_SEED_TICKET_PREFIX}${String(t.n).padStart(3, "0")}`;
-    const ticket =
-      (await prisma.ticket.findUnique({ where: { ticketNumber } })) ??
-      (await prisma.ticket.create({
-        data: {
-          ticketNumber,
-          requesterId: t.requester.id,
-          ticketOwnerId: t.owner?.id ?? null,
-          categoryId: t.category.id,
-          relatedSystemId: t.system.id,
-          summary: t.summary,
-          description: `${t.summary} — seeded Lab 4 description with enough detail to pass validation.`,
-          requestedPriority: t.reqP,
-          itPriority: t.itP,
-          currentStatus: t.status,
-          requesterIndicatedResolved: t.requesterIndicatedResolved ?? false,
-          createdAt: new Date(now - t.createdAgo),
-          resolvedAt: t.resolvedAgo !== undefined ? new Date(now - t.resolvedAgo) : null,
-          statusChanges: {
-            create: t.history.map((h) => ({
-              fromStatus: h.from,
-              toStatus: h.to,
-              changedById: h.by.id,
-              changedAt: new Date(now - h.ago),
-            })),
-          },
-        },
-      }));
+    actionCount += t.actions.length;
+    const firstKey = seedActionKey(t.key, 1);
+    const existing = await prisma.actionTaken.findFirst({ where: { clientRequestId: firstKey }, select: { ticketId: true } });
+    if (existing) continue;
 
-    for (const [i, a] of t.actions.entries()) {
-      const clientRequestId = `${SEED_ACTION_KEY_PREFIX}${ticketNumber}-${i + 1}`;
-      const actionAt = new Date(now + a.at);
-      const finishedAt = new Date(now + a.at + HOUR);
-      await prisma.actionTaken.upsert({
-        where: { ticketId_clientRequestId: { ticketId: ticket.id, clientRequestId } },
-        update: {},
-        create: {
-          ticketId: ticket.id,
-          clientRequestId,
-          actionAt,
-          description: a.description,
-          result: a.result ?? null,
-          status: a.status,
-          performedById: a.performedBy.id,
-          createdById: a.createdBy.id,
-          followUpRequired: a.followUpNote !== undefined,
-          followUpNote: a.followUpNote ?? null,
-          attachmentNotes: a.attachmentNotes ?? null,
-          completedAt: a.status === ActionStatus.COMPLETED ? finishedAt : null,
-          cancelledAt: a.status === ActionStatus.CANCELLED ? finishedAt : null,
+    const ticketNumber = await generateTicketNumber();
+    await prisma.ticket.create({
+      data: {
+        ticketNumber,
+        requesterId: t.requester.id,
+        ticketOwnerId: t.owner?.id ?? null,
+        categoryId: t.category.id,
+        relatedSystemId: t.system.id,
+        summary: t.summary,
+        description: `${t.summary} — seeded Lab 4 description with enough detail to pass validation.`,
+        requestedPriority: t.reqP,
+        itPriority: t.itP,
+        currentStatus: t.status,
+        requesterIndicatedResolved: t.requesterIndicatedResolved ?? false,
+        createdAt: new Date(now - t.createdAgo),
+        resolvedAt: t.resolvedAgo !== undefined ? new Date(now - t.resolvedAgo) : null,
+        statusChanges: {
+          create: t.history.map((h) => ({
+            fromStatus: h.from,
+            toStatus: h.to,
+            changedById: h.by.id,
+            changedAt: new Date(now - h.ago),
+          })),
         },
-      });
-      actionCount++;
-    }
+        actionsTaken: {
+          create: t.actions.map((a, i) => {
+            const finishedAt = new Date(now + a.at + HOUR);
+            return {
+              clientRequestId: seedActionKey(t.key, i + 1),
+              actionAt: new Date(now + a.at),
+              description: a.description,
+              result: a.result ?? null,
+              status: a.status,
+              performedById: a.performedBy.id,
+              createdById: a.createdBy.id,
+              followUpRequired: a.followUpNote !== undefined,
+              followUpNote: a.followUpNote ?? null,
+              attachmentNotes: a.attachmentNotes ?? null,
+              completedAt: a.status === ActionStatus.COMPLETED ? finishedAt : null,
+              cancelledAt: a.status === ActionStatus.CANCELLED ? finishedAt : null,
+            };
+          }),
+        },
+      },
+    });
+    created++;
   }
 
-  return { tickets: tickets.length, actions: actionCount, emptyRequester: emptyRequester.email };
+  return { tickets: tickets.length, created, actions: actionCount, emptyRequester: emptyRequester.email };
 }
 
 main()
