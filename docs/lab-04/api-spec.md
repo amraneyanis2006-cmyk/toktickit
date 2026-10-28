@@ -1,0 +1,293 @@
+# Lab 4 API Contract — TokTickIT Actions Taken, Ticket Workflow, Dashboards
+
+**Base URL (dev):** `http://localhost:3000/api` · **Content-Type:** `application/json`
+**Extends:** `docs/lab-03/api-spec.md`. Session authentication (§0 of Lab 3), the
+role markers, the `PASSWORD_CHANGE_REQUIRED` gate, and the error shape
+`{ "error": CODE, "message": text, "fields"?: { field: message } }` are unchanged.
+
+Role markers: 🔓 public · 🔒R Requester (+ownership) · 🔒S IT Staff or Administrator ·
+🔒A Administrator only.
+
+Every protected endpoint below returns, before any business logic:
+`401 NOT_AUTHENTICATED` (no/expired session), `403 PASSWORD_CHANGE_REQUIRED`,
+`403 FORBIDDEN` (wrong role). Unexpected errors return `500 INTERNAL_ERROR` with a
+generic message and no stack trace or SQL text.
+
+## 0. Shared Objects
+
+**ActionTaken**
+```json
+{
+  "id": 41,
+  "ticketNumber": "TKT-2026-000002",
+  "actionAt": "2026-10-28T03:15:00.000Z",
+  "description": "Reset the Wi-Fi profile and re-enrolled the certificate.",
+  "result": "Laptop reconnects; issue gone after reboot.",
+  "status": "COMPLETED",
+  "performedBy": { "id": 12, "name": "Alex Kim" },
+  "createdBy":   { "id": 12, "name": "Alex Kim" },
+  "followUpRequired": true,
+  "followUpNote": "Check again on Friday that the certificate auto-renews.",
+  "attachmentNotes": "See attachment wifi-error.png",
+  "completedAt": "2026-10-28T03:40:12.000Z",
+  "cancelledAt": null,
+  "createdAt": "2026-10-28T03:16:02.000Z",
+  "updatedAt": "2026-10-28T03:40:12.000Z"
+}
+```
+`clientRequestId` is never returned. Lists are ordered `actionAt` asc, `id` asc (BR-19).
+
+**StatusChange**
+```json
+{ "id": 7, "fromStatus": "IN_PROGRESS", "toStatus": "RESOLVED",
+  "changedBy": { "id": 12, "name": "Alex Kim" }, "changedAt": "2026-10-28T03:41:00.000Z" }
+```
+Ordered `changedAt` asc, `id` asc.
+
+**ResolutionGate** (staff detail only, computed by the same function the status
+endpoint uses)
+```json
+{ "canResolve": false, "blockers": ["OPEN_ACTIONS"] }
+```
+`blockers` ⊆ `["UNASSIGNED", "NO_COMPLETED_ACTION", "OPEN_ACTIONS"]`.
+
+**Active statuses** (used by filters and metrics):
+`NEW, OPEN, IN_PROGRESS, WAITING_FOR_REQUESTER, REOPENED`.
+
+## 1. GET /api/staff/tickets/:ticketNumber 🔒S (changed — additive)
+
+Lab 3 response plus:
+```json
+{
+  "resolvedAt": null,
+  "actionsTaken": [ /* ActionTaken[] */ ],
+  "statusHistory": [ /* StatusChange[] */ ],
+  "resolutionGate": { "canResolve": false, "blockers": ["NO_COMPLETED_ACTION"] },
+  "legalNextStatuses": ["WAITING_FOR_REQUESTER", "RESOLVED", "CANCELLED"]
+}
+```
+`404 NOT_FOUND` for an unknown ticket number.
+
+## 2. GET /api/tickets/:ticketNumber 🔒R (owner) (changed — additive)
+
+Lab 3 response plus `resolvedAt`, `actionsTaken` (same `ActionTaken` objects,
+read-only), and `statusHistory`. Still **never** contains `internalNotes`, not even as
+an empty key (Lab 3 AC-09). Another Requester's Ticket → `404 NOT_FOUND`.
+
+## 3. GET /api/staff/tickets/:ticketNumber/actions 🔒S
+
+- **200** `{ "data": ActionTaken[] }` (ordered, BR-19). Unknown ticket → `404`.
+
+## 4. POST /api/staff/tickets/:ticketNumber/actions 🔒S
+
+- **Request**
+```json
+{
+  "actionAt": "2026-10-28T03:15:00.000Z",
+  "description": "Reset the Wi-Fi profile.",
+  "result": null,
+  "followUpRequired": false,
+  "followUpNote": null,
+  "attachmentNotes": "See wifi-error.png",
+  "performedById": 12,
+  "clientRequestId": "6f1c7d1e-5c5b-4f3e-9a7e-1d7b0d3b2a10"
+}
+```
+`performedById` optional (defaults to the session user). `createdById` and
+`ticketId` are **never** read from the body (BR-01, BR-04). `status` is always
+`PLANNED` on creation.
+- **201** → `ActionTaken`.
+- **200** → the existing `ActionTaken` when the same `clientRequestId` was already
+  used on this Ticket (idempotent replay, BR-18).
+- **400 `VALIDATION_ERROR`** with `fields` (all invalid fields at once):
+  `actionAt` (missing, not ISO-8601, before ticket creation, > now + 5 min),
+  `description` (empty / > 2000), `result` (> 2000), `followUpNote` (required when
+  `followUpRequired` is true; > 1000), `attachmentNotes` (> 500),
+  `clientRequestId` (not a UUID).
+- **404 `NOT_FOUND`** unknown ticket.
+- **409 `TICKET_NOT_ACTIVE`** ticket is RESOLVED, CLOSED, or CANCELLED (BR-10).
+- **422 `INVALID_ASSIGNEE`** `performedById` is not an active IT Staff/Administrator.
+
+## 5. PATCH /api/staff/tickets/:ticketNumber/actions/:actionId 🔒S
+
+Edit and/or assign an **open** Action Taken. Partial update: only supplied fields
+change.
+- **Request**
+```json
+{
+  "expectedUpdatedAt": "2026-10-28T03:16:02.000Z",
+  "description": "Reset the Wi-Fi profile and certificate.",
+  "actionAt": "2026-10-28T03:20:00.000Z",
+  "result": "Partially fixed",
+  "followUpRequired": true,
+  "followUpNote": "Verify after next login.",
+  "attachmentNotes": null,
+  "performedById": 15
+}
+```
+- **200** → updated `ActionTaken`.
+- **400 `VALIDATION_ERROR`** same rules as §4, plus `expectedUpdatedAt` missing.
+- **404 `NOT_FOUND`** unknown ticket, or action not belonging to that ticket.
+- **409 `STALE_UPDATE`** `expectedUpdatedAt` ≠ stored `updatedAt`; body includes
+  `"current": ActionTaken` so the client can refresh (BR-17).
+- **409 `ACTION_LOCKED`** action is COMPLETED or CANCELLED (BR-09).
+- **409 `TICKET_NOT_ACTIVE`** (BR-10).
+- **422 `INVALID_ASSIGNEE`** (BR-05).
+
+## 6. PATCH /api/staff/tickets/:ticketNumber/actions/:actionId/status 🔒S
+
+- **Request** `{ "status": "COMPLETED", "result": "Fixed after reboot.", "expectedUpdatedAt": "…" }`
+  (`result` optional if already stored; required for COMPLETED when the stored result
+  is empty).
+- **200** → updated `ActionTaken` (`completedAt` / `cancelledAt` set by the server).
+- **400 `VALIDATION_ERROR`** invalid `status` value; `fields.result` when completing
+  without a Result; `expectedUpdatedAt` missing.
+- **409 `INVALID_ACTION_TRANSITION`** not allowed by BR-08 (e.g. COMPLETED → IN_PROGRESS).
+- **409 `STALE_UPDATE`** (with `current`), **409 `TICKET_NOT_ACTIVE`**, **404**.
+
+## 7. List endpoints — drill-down filters (changed — additive, backward compatible)
+
+### 7.1 GET /api/tickets 🔒R (My Tickets)
+New/extended query parameters (Lab 2/3 parameters unchanged):
+| Param | Values | Meaning |
+|---|---|---|
+| `status` | one status **or a comma-separated list** | `currentStatus IN (...)`; unknown values → `400 VALIDATION_ERROR` |
+| `resolvedWithinDays` | integer 1–365 | `resolvedAt ≥ now − N days` |
+
+### 7.2 GET /api/staff/tickets 🔒S (Ticket Queue)
+| Param | Values | Meaning |
+|---|---|---|
+| `status` | one status or comma-separated list | `currentStatus IN (...)` |
+| `priority` | `LOW\|MEDIUM\|HIGH\|NONE` | IT Priority; `NONE` = `itPriority IS NULL` |
+| `requesterResolved` | `true` | `requesterIndicatedResolved = true` |
+| `ownership` | `mine\|unassigned\|all` | unchanged |
+
+Response shape unchanged (`data`, `pagination.totalItems`), which is what the
+drill-down equality test compares with the dashboard value (BR-26).
+
+### 7.3 GET /api/admin/users 🔒A
+Unchanged API; the UI now initialises its existing `role` filter from the URL
+(`/admin/users?role=IT_STAFF`). The `userAccounts` drill-down also passes
+`status=active|inactive`, applied by the existing filter logic or added as
+`isActive=true|false` (additive).
+
+## 8. PATCH /api/staff/tickets/:ticketNumber/status 🔒S (changed)
+
+- **Request** `{ "currentStatus": "RESOLVED", "expectedUpdatedAt": "2026-10-28T03:40:12.000Z" }`
+  (`expectedUpdatedAt` optional for Lab 3 compatibility; always sent by the Lab 4 UI).
+- **Processing order:** validate value → load ticket (404) → stale check (409
+  `STALE_UPDATE`) → matrix (409 `INVALID_TRANSITION`) → owner check for
+  RESOLVED/CLOSED (409 `UNASSIGNED_TICKET`) → resolution gate for RESOLVED (409
+  `RESOLUTION_BLOCKED`) → **one transaction**: conditional update
+  `WHERE id = :id AND currentStatus = :readStatus` (0 rows → 409 `STALE_UPDATE`),
+  set/clear `resolvedAt`, clear `requesterIndicatedResolved` on REOPENED, insert
+  `TicketStatusChange`.
+- **200**
+```json
+{
+  "ticketNumber": "TKT-2026-000002",
+  "currentStatus": "RESOLVED",
+  "requesterIndicatedResolved": false,
+  "resolvedAt": "2026-10-28T03:41:00.000Z",
+  "updatedAt": "2026-10-28T03:41:00.000Z",
+  "legalNextStatuses": ["CLOSED", "REOPENED"],
+  "statusChange": { /* StatusChange */ }
+}
+```
+- **409 `RESOLUTION_BLOCKED`**
+```json
+{ "error": "RESOLUTION_BLOCKED",
+  "message": "This ticket cannot be resolved yet: complete or cancel the open actions.",
+  "blockers": ["OPEN_ACTIONS"] }
+```
+
+## 9. GET /api/dashboard/requester 🔒R
+
+Scoped to the session user (BR-24); query parameters are ignored.
+```json
+{
+  "generatedAt": "2026-10-28T09:00:00.000Z",
+  "windowDays": 7,
+  "metrics": {
+    "openTickets":       { "value": 3,  "drillDown": "/tickets?status=NEW,OPEN,IN_PROGRESS,WAITING_FOR_REQUESTER,REOPENED" },
+    "waitingForMe":      { "value": 1,  "drillDown": "/tickets?status=WAITING_FOR_REQUESTER" },
+    "resolvedLast7Days": { "value": 2,  "drillDown": "/tickets?status=RESOLVED,CLOSED&resolvedWithinDays=7" },
+    "closedTickets":     { "value": 12, "drillDown": "/tickets?status=CLOSED" }
+  },
+  "attentionTickets": [
+    { "ticketNumber": "TKT-2026-000003", "summary": "Need software license reactivated",
+      "currentStatus": "WAITING_FOR_REQUESTER", "updatedAt": "2026-10-27T10:00:00.000Z" }
+  ],
+  "recentTickets": [ /* same item shape, max 5 */ ]
+}
+```
+Empty: all `value` = 0, lists = `[]` (BR-25). IT Staff/Administrator → `403 FORBIDDEN`.
+
+## 10. GET /api/dashboard/staff 🔒S
+
+```json
+{
+  "generatedAt": "2026-10-28T09:00:00.000Z",
+  "windowDays": 7,
+  "metrics": {
+    "unassignedOpen":   { "value": 4, "drillDown": "/staff/tickets?ownership=unassigned&status=NEW,OPEN,IN_PROGRESS,WAITING_FOR_REQUESTER,REOPENED" },
+    "myOpenTickets":    { "value": 6, "drillDown": "/staff/tickets?ownership=mine&status=NEW,OPEN,IN_PROGRESS,WAITING_FOR_REQUESTER,REOPENED" },
+    "awaitingReview":   { "value": 1, "drillDown": "/staff/tickets?requesterResolved=true&status=NEW,OPEN,IN_PROGRESS,WAITING_FOR_REQUESTER,REOPENED" },
+    "highPriorityOpen": { "value": 3, "drillDown": "/staff/tickets?priority=HIGH&status=NEW,OPEN,IN_PROGRESS,WAITING_FOR_REQUESTER,REOPENED" },
+    "myOpenActions":    { "value": 2, "drillDown": "#my-open-actions" }
+  },
+  "byStatus": { "NEW": 2, "OPEN": 1, "IN_PROGRESS": 3, "WAITING_FOR_REQUESTER": 1,
+                "RESOLVED": 2, "CLOSED": 1, "REOPENED": 1, "CANCELLED": 1 },
+  "byItPriority": { "LOW": 2, "MEDIUM": 3, "HIGH": 3, "NONE": 1 },
+  "myOpenActionsList": [
+    { "id": 41, "ticketNumber": "TKT-2026-000002", "ticketSummary": "Cannot connect to campus Wi-Fi",
+      "description": "Reset the Wi-Fi profile.", "status": "IN_PROGRESS",
+      "actionAt": "2026-10-28T03:15:00.000Z", "followUpRequired": false }
+  ],
+  "urgentTickets": [ { "ticketNumber": "…", "summary": "…", "currentStatus": "OPEN", "itPriority": "HIGH", "ticketOwner": null, "createdAt": "…" } ],
+  "recentTickets": [ { "ticketNumber": "…", "summary": "…", "currentStatus": "…", "updatedAt": "…" } ],
+  "userAccounts": { "activeRequesters": 5, "activeItStaff": 3, "activeAdministrators": 1, "inactive": 2 }
+}
+```
+`byStatus` always contains all 8 keys and `byItPriority` all 4 keys (zeros included),
+each with drill-down `/staff/tickets?status=<S>` or
+`/staff/tickets?priority=<P>&status=<active>` built by the client from the key.
+`userAccounts` is present **only** for an Administrator (BR-27). Requester → `403`.
+
+## 11. GET /api/health 🔓 (changed)
+
+- **200** `{ "status": "ok", "database": "ok" }` · **503**
+  `{ "status": "degraded", "database": "unreachable" }` when a `SELECT 1` fails.
+  (Lab 1 test still passes: it checks the 200 response.)
+
+## 12. Removed / Not Provided
+
+- No `DELETE` on Actions Taken, Status History, Public Comments, or Internal Notes
+  (append-only, BR-09). A `DELETE` request to these paths returns `404 NOT_FOUND`
+  (no route).
+- No endpoint lets a Requester create or change Actions Taken or the Ticket status.
+
+## 13. HTTP Status Code Summary (Lab 4 additions)
+
+| Status | Codes |
+|---|---|
+| 200 | idempotent replay of an Action Taken create |
+| 400 | `VALIDATION_ERROR` (Action Taken fields, unknown status in list filter, missing `expectedUpdatedAt`) |
+| 409 | `RESOLUTION_BLOCKED`, `STALE_UPDATE`, `INVALID_ACTION_TRANSITION`, `ACTION_LOCKED`, `TICKET_NOT_ACTIVE` (+ Lab 3 codes) |
+| 422 | `INVALID_ASSIGNEE` (+ Lab 3 `INVALID_OWNER`) |
+| 503 | health check with database unreachable |
+
+## 14. Role Authorization Matrix (backend-enforced)
+
+| Operation | Requester | IT Staff | Administrator |
+|---|---|---|---|
+| Read Actions Taken / Status History of own Ticket | ✅ (read-only) | ✅ any Ticket | ✅ any Ticket |
+| Read Actions Taken of another Requester's Ticket | ❌ 404 | ✅ | ✅ |
+| Create / edit / assign / start / complete / cancel Action Taken | ❌ 403 | ✅ | ✅ |
+| Be the Performed by of an Action Taken | ❌ (422) | ✅ (active) | ✅ (active) |
+| Change Ticket status (incl. resolve, close, reopen, cancel) | ❌ 403 | ✅ | ✅ |
+| Set "Problem Appears Resolved" | ✅ own Ticket | ❌ 403 | ❌ 403 |
+| Requester dashboard | ✅ own data | ❌ 403 | ❌ 403 |
+| Staff dashboard | ❌ 403 | ✅ | ✅ + `userAccounts` |
+| Read Internal Notes | ❌ 403 | ✅ | ✅ |
+| User management (`/api/admin/*`) | ❌ 403 | ❌ 403 | ✅ |
