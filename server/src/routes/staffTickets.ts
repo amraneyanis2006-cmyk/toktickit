@@ -400,7 +400,7 @@ router.patch(
       // Optional for Lab 3 compatibility; when sent it must be a valid timestamp.
       const expected = rawExpected === undefined || rawExpected === null ? null : parseIsoDateTime(rawExpected);
       if (rawExpected !== undefined && rawExpected !== null && !expected) {
-        fields.expectedUpdatedAt = 'expectedUpdatedAt must be an ISO-8601 date-time.';
+        fields.expectedUpdatedAt = 'expectedUpdatedAt must be an ISO-8601 date-time with a time zone.';
       }
       if (Object.keys(fields).length > 0) {
         return res.status(400).json({

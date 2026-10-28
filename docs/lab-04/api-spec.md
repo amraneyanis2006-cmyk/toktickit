@@ -204,8 +204,8 @@ The UI initialises its `role` and `isActive` filters from the URL
   `WHERE id = :id AND currentStatus = :readStatus` (plus `AND updatedAt =
   :expectedUpdatedAt` when the token is sent; 0 rows → 409 `STALE_UPDATE`),
   set/clear `resolvedAt`, clear `requesterIndicatedResolved` on REOPENED, insert
-  `TicketStatusChange` (the conditional update is untested defence in depth; the locked-row
-  re-check is what catches a concurrent change). Every Action Taken write
+  `TicketStatusChange` (the conditional update is defence in depth behind the
+  locked-row re-check). Every Action Taken write
   (`POST …/actions`, `PATCH …/actions/:actionId`, `PATCH …/actions/:actionId/status`)
   takes a share lock on the same ticket row
   and re-reads its status in its own transaction, so a concurrent status change and
@@ -238,8 +238,8 @@ The UI initialises its `role` and `isActive` filters from the URL
   `updatedAt`, `legalNextStatuses`).
 - **400 `VALIDATION_ERROR`** with `fields.currentStatus` (missing/unknown value) or
   `fields.expectedUpdatedAt` (sent but not an ISO-8601 date-time with a time zone).
-  A lock wait longer than the 15 s transaction timeout ends in a generic
-  `500 INTERNAL_ERROR` (known limitation).
+- **500 `INTERNAL_ERROR`** a lock wait longer than the 15 s transaction timeout
+  (known limitation).
 
 ## 9. GET /api/dashboard/requester 🔒R
 

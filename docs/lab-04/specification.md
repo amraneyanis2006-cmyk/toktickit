@@ -443,7 +443,7 @@ into `main`, `reviewer.md` and `ai-use.md` completed, submission PDF Answer Part
      reach the screen it tests. No other change to earlier tests is allowed.
    - **CHG-02** — the resolution gate means a Ticket cannot be resolved without
      recorded work. Lab 3 tests that resolve a Ticket now first create one COMPLETED
-     Action Taken in their fixture; their assertions are unchanged. Because the
+     Action Taken in their (shared) fixture; their assertions are unchanged. Because the
      status endpoint now writes `TicketStatusChange` rows (FK to the Ticket), those
      tests' teardown also deletes the fixture actions and history rows before their
      tickets; this teardown is part of the CHG-02 fixture change.
@@ -469,5 +469,5 @@ into `main`, `reviewer.md` and `ai-use.md` completed, submission PDF Answer Part
    `legalNextStatuses`; (j) CHG-02 (§11.7) also covers the teardown of fixture actions
    and history rows, and the CHG-02 action sits in the shared fixture of the Lab 3 file
    whose tests resolve a Ticket (tests.md REG-01, WF-02/05/06/09 rows updated to match).
-   The status transaction locks with `FOR NO KEY UPDATE`. These tighten BR-10, BR-12 and
+   These tighten BR-10, BR-12 and
    BR-17; no rule is relaxed.

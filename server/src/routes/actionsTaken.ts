@@ -209,7 +209,7 @@ router.post('/staff/tickets/:ticketNumber/actions', ...staffOnly, async (req: Re
 
     try {
       // Share-lock the ticket and re-read its status, so a concurrent resolve
-      // (which takes FOR UPDATE on the same row) either sees this action in its
+      // (which takes FOR NO KEY UPDATE on the same row) either sees this action in its
       // gate or has already committed and this create is refused (BR-10, BR-12).
       const created = await prisma.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticket.id} FOR SHARE`;

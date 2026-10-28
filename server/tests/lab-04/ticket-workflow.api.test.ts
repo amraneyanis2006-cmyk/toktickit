@@ -82,7 +82,8 @@ async function raceAgainst<T>(
   try {
     await prisma.$transaction(
       async (tx) => {
-        if (mode === 'UPDATE') await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticketId} FOR UPDATE`;
+          // 'UPDATE' stands in for the status endpoint, so it takes the same lock mode.
+        if (mode === 'UPDATE') await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticketId} FOR NO KEY UPDATE`;
         else await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticketId} FOR SHARE`;
         const pidRows = await tx.$queryRaw<Array<{ pid: number }>>`SELECT pg_backend_pid() AS pid`;
         const pid = pidRows[0]!.pid;
@@ -308,6 +309,11 @@ describe('Transition matrix (BR-11)', () => {
         checked++;
       }
     }
+    // The matrix is checked before the owner: an unowned illegal pair is INVALID_TRANSITION.
+    const unowned = await createTicket(prisma, fx, { status: 'NEW', ownerId: null });
+    const illegal = await changeStatus(unowned.ticketNumber, { currentStatus: 'RESOLVED' });
+    expect(illegal.status).toBe(409);
+    expect(illegal.body.error).toBe('INVALID_TRANSITION');
     // 64 pairs minus the 17 legal edges of spec sec 5.1.
     expect(checked).toBe(47);
     expect(await historyCount(ticket.id)).toBe(0);
@@ -382,6 +388,19 @@ describe('Stale and concurrent status changes (BR-17)', () => {
     expect(res.body.error).toBe('STALE_UPDATE');
     expect(res.body.current.currentStatus).toBe('WAITING_FOR_REQUESTER');
     expect((await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } })).currentStatus).toBe('WAITING_FOR_REQUESTER');
+    expect(await historyCount(ticket.id)).toBe(0);
+  });
+
+  it('WF-05: on the locked row the status is re-checked before the owner (STALE_UPDATE, not UNASSIGNED_TICKET)', async () => {
+    const ticket = await resolvable();
+    const res = await raceAgainst(
+      ticket.id,
+      'UPDATE',
+      (tx) => tx.ticket.update({ where: { id: ticket.id }, data: { currentStatus: 'WAITING_FOR_REQUESTER', ticketOwnerId: null } }),
+      () => changeStatus(ticket.ticketNumber, { currentStatus: 'RESOLVED' })
+    );
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('STALE_UPDATE');
     expect(await historyCount(ticket.id)).toBe(0);
   });
 
