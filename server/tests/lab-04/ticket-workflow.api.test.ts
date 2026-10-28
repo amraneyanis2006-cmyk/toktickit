@@ -627,7 +627,7 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
     const neighbour = await createTicket(prisma, fx);
     const nPlanned = await addAction(neighbour.id, 'PLANNED');
     const nStarted = await addAction(neighbour.id, 'IN_PROGRESS');
-    const ticket = await createTicket(prisma, fx);
+    const ticket = await createTicket(prisma, fx, { status: 'IN_PROGRESS' });
     const planned = await addAction(ticket.id, 'PLANNED', 90);
     const started = await addAction(ticket.id, 'IN_PROGRESS', 60);
     const done = await addAction(ticket.id, 'COMPLETED', 30);
@@ -663,6 +663,8 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
     // The serialized detail shows the cascade (staff and Requester).
     const staffDetail = await request(app).get(`/api/staff/tickets/${ticket.ticketNumber}`).set('Cookie', staffCookie);
     const own = await request(app).get(`/api/tickets/${ticket.ticketNumber}`).set('Cookie', await loginAs(fx.requesterA.email));
+    const list = await request(app).get(`/api/staff/tickets/${ticket.ticketNumber}/actions`).set('Cookie', staffCookie);
+    expect(list.body.data.find((a: { id: number }) => a.id === planned.id)).toMatchObject({ status: 'CANCELLED' });
     for (const detail of [staffDetail, own]) {
       const shown = detail.body.actionsTaken.find((a: { id: number }) => a.id === planned.id);
       expect(shown).toMatchObject({ status: 'CANCELLED', cancelledAt: res.body.statusChange.changedAt });
@@ -674,7 +676,10 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
     const token = planned.updatedAt.toISOString();
     const lateEdit = await request(app).patch(actionUrl).set('Cookie', staffCookie).send({ expectedUpdatedAt: token, description: 'late' });
     const lateStatus = await request(app).patch(`${actionUrl}/status`).set('Cookie', staffCookie).send({ status: 'IN_PROGRESS', expectedUpdatedAt: token });
-    for (const late of [lateEdit, lateStatus]) {
+    const fresh = res.body.statusChange.changedAt;
+    const freshEdit = await request(app).patch(actionUrl).set('Cookie', staffCookie).send({ expectedUpdatedAt: fresh, description: 'late' });
+    const freshStatus = await request(app).patch(`${actionUrl}/status`).set('Cookie', staffCookie).send({ status: 'IN_PROGRESS', expectedUpdatedAt: fresh });
+    for (const late of [lateEdit, lateStatus, freshEdit, freshStatus]) {
       expect(late.status).toBe(409);
       expect(late.body.error).toBe('TICKET_NOT_ACTIVE');
     }
@@ -753,20 +758,36 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
       cancelledAt: null,
     });
     expect(await historyCount(ticket.id)).toBe(0);
+
+    // Without a token (Lab 3 clients) only the locked-row status re-check stops it.
+    const noToken = await createTicket(prisma, fx);
+    const open2 = await addAction(noToken.id, 'PLANNED');
+    const res2 = await raceAgainst(
+      noToken.id,
+      'UPDATE',
+      (tx) => tx.ticket.update({ where: { id: noToken.id }, data: { currentStatus: 'WAITING_FOR_REQUESTER' } }),
+      () => changeStatus(noToken.ticketNumber, { currentStatus: 'CANCELLED' })
+    );
+    expect(res2.status).toBe(409);
+    expect(res2.body.error).toBe('STALE_UPDATE');
+    expect(await prisma.actionTaken.findUniqueOrThrow({ where: { id: open2.id } })).toMatchObject({ status: 'PLANNED', updatedAt: open2.updatedAt, cancelledAt: null });
+    expect(await historyCount(noToken.id)).toBe(0);
   });
 
-  it('WF-09: a cancel refused with STALE_UPDATE leaves the open actions untouched', async () => {
-    const ticket = await createTicket(prisma, fx);
-    const open = await addAction(ticket.id, 'PLANNED');
-    const res = await changeStatus(ticket.ticketNumber, { currentStatus: 'CANCELLED', expectedUpdatedAt: '2020-01-01T00:00:00.000Z' });
-    expect(res.status).toBe(409);
-    expect(res.body.error).toBe('STALE_UPDATE');
-    expect(await prisma.actionTaken.findUniqueOrThrow({ where: { id: open.id } })).toMatchObject({
-      status: 'PLANNED',
-      updatedAt: open.updatedAt,
-      cancelledAt: null,
-    });
-    expect(await historyCount(ticket.id)).toBe(0);
+  it('WF-09: a new create (fresh key or no key) blocked behind a cancel is TICKET_NOT_ACTIVE and saves nothing', async () => {
+    for (const key of [randomUUID(), undefined]) {
+      const ticket = await createTicket(prisma, fx);
+      const body = { actionAt: new Date(Date.now() - 60_000).toISOString(), description: 'New during cancel', followUpRequired: false, ...(key ? { clientRequestId: key } : {}) };
+      const res = await raceAgainst(
+        ticket.id,
+        'UPDATE',
+        (tx) => tx.ticket.update({ where: { id: ticket.id }, data: { currentStatus: 'CANCELLED' } }),
+        () => request(app).post(`/api/staff/tickets/${ticket.ticketNumber}/actions`).set('Cookie', staffCookie).send(body)
+      );
+      expect(res.status, String(key)).toBe(409);
+      expect(res.body.error, String(key)).toBe('TICKET_NOT_ACTIVE');
+      expect(await prisma.actionTaken.count({ where: { ticketId: ticket.id } }), String(key)).toBe(0);
+    }
   });
 
   it('WF-09: a retried create blocked behind a cancel that committed the original returns the replay, not TICKET_NOT_ACTIVE', async () => {

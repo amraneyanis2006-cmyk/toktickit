@@ -98,9 +98,9 @@ an empty key (Lab 3 AC-09). Another Requester's Ticket → `404 NOT_FOUND`.
 `ticketId` are **never** read from the body (BR-01, BR-04). `status` is always
 `PLANNED` on creation.
 - **201** → `ActionTaken`.
-- **200** → the existing `ActionTaken` in its current state, unchanged by the replay, when the
-  same `clientRequestId` was
-  already used on this Ticket **with the same payload** (idempotent replay, BR-18). The
+- **200** → the existing `ActionTaken` in its current state, unchanged by the replay, when
+  the same `clientRequestId` was already used on this Ticket **with the same payload**
+  (idempotent replay, BR-18). The
   replay is answered before the `TICKET_NOT_ACTIVE` check and returns the action in its
   current state (e.g. CANCELLED after a ticket-cancel cascade). Check order: ticket (404) →
   validation (400, needs the ticket's creation time) → replay (200) /
@@ -221,7 +221,8 @@ The UI initialises its `role` and `isActive` filters from the URL
   :expectedUpdatedAt` when the token is sent; 0 rows → 409 `STALE_UPDATE`; defence in
   depth behind the locked-row re-check), set/clear `resolvedAt`, clear
   `requesterIndicatedResolved` on REOPENED, on CANCELLED set every PLANNED/IN_PROGRESS
-  Action Taken of the ticket to CANCELLED (`cancelledAt` = the change time, BR-13),
+  Action Taken of the ticket to CANCELLED (`cancelledAt` = `updatedAt` = the change time,
+  BR-13/BR-17),
   insert `TicketStatusChange`. Every Action Taken write
   (`POST …/actions`, `PATCH …/actions/:actionId`, `PATCH …/actions/:actionId/status`)
   takes a share lock on the same ticket row (design rule: every transaction that

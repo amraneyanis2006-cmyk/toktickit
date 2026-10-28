@@ -480,7 +480,7 @@ into `main`, `reviewer.md` and `ai-use.md` completed, submission PDF Answer Part
    open on a ticket where BR-10 forbids further action writes; action writes on an
    inactive ticket answer `TICKET_NOT_ACTIVE` before `ACTION_LOCKED`/`STALE_UPDATE`
    (AC-06 qualified accordingly).
-   They tighten BR-10, BR-12 and BR-13. BR-17 gains one server-only exception (the BR-13
-   cascade updates actions without a token), and on inactive tickets clients now get
+   (a)–(j) tighten BR-10, BR-12 and BR-17; (k) tightens BR-10 and BR-13. BR-17 gains one
+   server-only exception (the BR-13 cascade updates actions without a token), and on inactive tickets clients now get
    BR-10 `TICKET_NOT_ACTIVE` instead of BR-08/BR-09 `ACTION_LOCKED`. BR-18 is answered
    before BR-10, also for a retry that waited behind a cancel.
