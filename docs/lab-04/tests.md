@@ -20,7 +20,7 @@ Planned before implementation (Spec DD → Test DD → TDD). Every AC in
 | UNIT-02 | Unit | BR-12 | `computeResolutionGate(ticket, actions)` | Blockers UNASSIGNED / NO_COMPLETED_ACTION / OPEN_ACTIONS exactly when they apply; `canResolve` only when none | server/tests/lab-04/unit/resolutionGate.unit.test.ts | Planned |
 | UNIT-03 | Unit | BR-06, BR-07 | Action Taken field validation | Trims; rejects empty/too long description, missing follow-up note when required, date before ticket or > now+5 min; returns every field error | server/tests/lab-04/unit/actionValidation.unit.test.ts | Planned |
 | UNIT-04 | Unit | BR-22, BR-23 | Dashboard constants and window | Active status list is exactly the 5 values; window start = now − 7×24 h independent of TZ | server/tests/lab-04/unit/dashboardWindow.unit.test.ts | Planned |
-| UNIT-05 | Unit | API §7 | Comma-separated status filter parser | Parses one or many statuses, de-duplicates, rejects unknown values | server/tests/lab-04/unit/statusFilter.unit.test.ts | Planned |
+| UNIT-05 | Unit | API §7 | Comma-separated status filter parser | Parses one or many statuses, de-duplicates, rejects any unknown value (single or in a comma-separated list) with a `fields.status` error | server/tests/lab-04/unit/statusFilter.unit.test.ts | Planned |
 
 ## 2. API / Integration Tests — Actions Taken
 
@@ -80,7 +80,7 @@ Planned before implementation (Spec DD → Test DD → TDD). Every AC in
 | SEC-02 | Security | AC-05, BR-20 | Requester reads tickets | Own ticket: actions read-only, no internalNotes; other Requester's ticket → 404 | server/tests/lab-04/security.api.test.ts | Planned |
 | SEC-03 | Security | api-spec §0 | Every new endpoint without a session | 401 NOT_AUTHENTICATED | server/tests/lab-04/security.api.test.ts | Planned |
 | SEC-04 | Security | Lab 3 BR-03 | Password-change gate on new endpoints | 403 PASSWORD_CHANGE_REQUIRED | server/tests/lab-04/security.api.test.ts | Planned |
-| SEC-05 | Security | FR-20 | Malformed ids and payloads | Non-numeric/unknown actionId → 404, wrong types → 400; never 500, no stack trace | server/tests/lab-04/security.api.test.ts | Planned |
+| SEC-05 | Security | FR-20 | Malformed ids and payloads | Non-numeric/unknown actionId → 404, wrong types → 400; unknown `status` filter value (single or comma-separated) on `GET /api/tickets` and `GET /api/staff/tickets` → 400 VALIDATION_ERROR with `fields.status`; never 500, no stack trace | server/tests/lab-04/security.api.test.ts | Planned |
 
 ## 6. Migration / Regression Tests
 
@@ -92,7 +92,7 @@ Planned before implementation (Spec DD → Test DD → TDD). Every AC in
 | MIG-04 | Migration | §7.2 | Seed idempotency | Running the seed twice leaves every table count unchanged | server/tests/lab-04/migration.api.test.ts | Planned |
 | REG-01 | Regression | AC-21 | All Lab 1–3 server suites | Pass (only CHG-02 fixture change) | server/tests/lab-01/, server/tests/lab-02/, server/tests/lab-03/ | Planned |
 | REG-02 | Regression | AC-21 | All Lab 2–3 client suites | Pass | client/tests/lab-02/, client/tests/lab-03/ | Planned |
-| REG-03 | Regression | AC-21 | All Lab 2–3 Playwright specs | Pass (only CHG-01 landing assertions changed) | e2e/lab-02/, e2e/lab-03/ | Planned |
+| REG-03 | Regression | AC-21 | All Lab 2–3 Playwright specs | Pass; only CHG-01 changes: either the post-login landing-URL assertion is updated or exactly one navigation step (`page.goto` or a nav click) is added right after login; nothing else changes | e2e/lab-02/, e2e/lab-03/ | Planned |
 
 ## 7. Performance Smoke Tests
 
@@ -101,7 +101,7 @@ Planned before implementation (Spec DD → Test DD → TDD). Every AC in
 | PERF-01 | Performance | AC-25 | Requester dashboard, 10 calls | p95 < 500 ms | server/tests/lab-04/performance.smoke.test.ts | Planned |
 | PERF-02 | Performance | AC-25 | Staff dashboard (Admin), 10 calls | p95 < 500 ms | server/tests/lab-04/performance.smoke.test.ts | Planned |
 | PERF-03 | Performance | FR-01 | Staff Ticket Detail with 25 actions | < 500 ms | server/tests/lab-04/performance.smoke.test.ts | Planned |
-| PERF-04 | Smoke | FR-24 | `GET /api/health` | 200 `{status:"ok", database:"ok"}` | server/tests/lab-04/performance.smoke.test.ts | Planned |
+| PERF-04 | Smoke | FR-24 | `GET /api/health` and `GET /api/health/db` | `/api/health` 200 `{status:"ok", service:"TokTickIT API"}` (unchanged); `/api/health/db` 200 `{database:"ok"}` | server/tests/lab-04/performance.smoke.test.ts | Planned |
 
 ## 8. UI Component Tests (client)
 
@@ -189,6 +189,11 @@ npx playwright test e2e/lab-04                 # Lab 4 E2E, responsive, a11y, sa
 npm run test:e2e                               # complete Labs 2–4 Playwright suite
 npx tsx scripts/lab4-metrics-check.ts > artifacts/lab-04/metrics-check.txt
 ```
+
+**Server test timeout:** from Issue #61 the server Vitest config sets
+`testTimeout: 15000` (config only, no test edited). The bcrypt cost-12 Lab 3 API tests
+(e.g. `users-admin.api.test.ts` reset-password, about 5.1 s) exceed the 5 s default on a
+loaded machine.
 
 ## 14. Final Results
 

@@ -151,13 +151,13 @@ change.
 New/extended query parameters (Lab 2/3 parameters unchanged):
 | Param | Values | Meaning |
 |---|---|---|
-| `status` | one status **or a comma-separated list** | `currentStatus IN (...)`; unknown values → `400 VALIDATION_ERROR` |
+| `status` | one status **or a comma-separated list** | `currentStatus IN (...)`; any unknown value → `400 VALIDATION_ERROR` with `fields.status` (Lab 3 returned 500) |
 | `resolvedWithinDays` | integer 1–365 | `resolvedAt ≥ now − N days` |
 
 ### 7.2 GET /api/staff/tickets 🔒S (Ticket Queue)
 | Param | Values | Meaning |
 |---|---|---|
-| `status` | one status or comma-separated list | `currentStatus IN (...)` |
+| `status` | one status or comma-separated list | `currentStatus IN (...)`; any unknown value → `400 VALIDATION_ERROR` with `fields.status` (Lab 3 returned 500) |
 | `priority` | `LOW\|MEDIUM\|HIGH\|NONE` | IT Priority; `NONE` = `itPriority IS NULL` |
 | `requesterResolved` | `true` | `requesterIndicatedResolved = true` |
 | `ownership` | `mine\|unassigned\|all` | unchanged |
@@ -260,11 +260,14 @@ each with drill-down `/staff/tickets?status=<S>` or
 `/staff/tickets?priority=<P>&status=<active>` built by the client from the key.
 `userAccounts` is present **only** for an Administrator (BR-27). Requester → `403`.
 
-## 11. GET /api/health 🔓 (changed)
+## 11. Health endpoints 🔓
 
-- **200** `{ "status": "ok", "database": "ok" }` · **503**
-  `{ "status": "degraded", "database": "unreachable" }` when a `SELECT 1` fails.
-  (Lab 1 test still passes: it checks the 200 response.)
+- `GET /api/health` — **unchanged from Lab 1**: **200**
+  `{ "status": "ok", "service": "TokTickIT API" }` (the Lab 1 test asserts this exact
+  body).
+- `GET /api/health/db` (new, public) — runs `SELECT 1`: **200** `{ "database": "ok" }`;
+  **503** `{ "database": "unreachable" }` when the query fails (no error detail in the
+  body).
 
 ## 12. Removed / Not Provided
 
@@ -281,7 +284,7 @@ each with drill-down `/staff/tickets?status=<S>` or
 | 400 | `VALIDATION_ERROR` (Action Taken fields, unknown status in list filter, missing `expectedUpdatedAt`) |
 | 409 | `RESOLUTION_BLOCKED`, `STALE_UPDATE`, `INVALID_ACTION_TRANSITION`, `ACTION_LOCKED`, `TICKET_NOT_ACTIVE` (+ Lab 3 codes) |
 | 422 | `INVALID_ASSIGNEE` (+ Lab 3 `INVALID_OWNER`) |
-| 503 | health check with database unreachable |
+| 503 | `GET /api/health/db` with database unreachable |
 
 ## 14. Role Authorization Matrix (backend-enforced)
 

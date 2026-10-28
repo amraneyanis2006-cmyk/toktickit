@@ -62,7 +62,7 @@ color alone (text label + icon where useful).
   Empty list → `zg-callout-neutral` message specific to the list.
 - **States:** loading = skeleton cards/rows (no layout jump); failure =
   `zg-callout-error` "We couldn't load your dashboard." + Retry; forbidden =
-  redirect to the role's dashboard + toast (route guard, as Lab 3); counts never
+  redirect to the role's dashboard (route guard, as Lab 3; no toast); counts never
   computed on the client.
 
 ## 4. Requester Dashboard (`/dashboard`, Requester)
@@ -163,7 +163,9 @@ your ticket"; no Created-by column (shows Performed by only).
   `INVALID_TRANSITION` / `STALE_UPDATE` shows a `zg-callout-error` with the
   server message, the selection is reset, and the Ticket reloads.
 - **Success** refreshes the summary in place: status badge, "Resolved on …", legal
-  next statuses, Status History, and the toast "Status changed to Resolved".
+  next statuses, Status History, and shows an inline success callout
+  (`zg-callout-info`, `role="status"`), e.g. "Status changed to Resolved." There is no
+  toast component.
 - **Awaiting review banner** (`zg-callout-info` + `zg-badge-awaiting-review`) at the top
   of Staff Ticket Detail when `requesterIndicatedResolved` is true and the Ticket is
   active: "The requester says the problem appears resolved. Review the actions

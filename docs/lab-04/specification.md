@@ -107,7 +107,7 @@ final demonstration.
 | FR-21 | Repeated clicks and network retries cannot create duplicate Actions Taken or apply a status change twice (BR-17, BR-18). |
 | FR-22 | The Action Taken form and the status change keep the entered values after a recoverable failure (network error, 409, 500). |
 | FR-23 | No console errors, broken links, placeholder text, temporary or duplicate UI elements remain; README setup, migration, seed, test, and demo instructions are current. |
-| FR-24 | `GET /api/health` reports the API and database status for the final demonstration. |
+| FR-24 | `GET /api/health` stays exactly as in Lab 1 (`{ status: "ok", service: "TokTickIT API" }`); a new public `GET /api/health/db` reports the database status (`SELECT 1`) for the final demonstration. |
 
 ## 5. Business Rules
 
@@ -211,7 +211,9 @@ Full details in `docs/lab-04/ui-spec.md`. Summary:
 - **Shared:** Zen Green tokens/badges from Labs 2–3 reused; new Action status badges
   (Planned, In Progress, Completed, Cancelled) and a Follow-up badge; every state
   (loading, empty, no-results, forbidden, conflict, not-found, failure) uses the
-  existing components.
+  existing components. Success feedback is an inline `zg-callout-info` with
+  `role="status"` (no toast component); a forbidden route redirects to the role's
+  dashboard, as in Lab 3, without a toast.
 
 ## 7. Data Changes
 
@@ -353,7 +355,8 @@ Exact shapes in `docs/lab-04/api-spec.md`. New or changed endpoints:
 | `GET /api/admin/users` | (changed, additive) `isActive` filter; existing `role` filter used by drill-down | Admin |
 | `GET /api/dashboard/requester` | Requester dashboard | Requester |
 | `GET /api/dashboard/staff` | IT Staff dashboard (+ `userAccounts` for Admin) | IT Staff, Admin |
-| `GET /api/health` | (changed) `{ status, database }` | Public |
+| `GET /api/health` | (unchanged from Lab 1) `{ status, service }` | Public |
+| `GET /api/health/db` | (new) database status: `200 { database: "ok" }` / `503 { database: "unreachable" }` | Public |
 
 New error codes: `409 RESOLUTION_BLOCKED`, `409 STALE_UPDATE`,
 `409 INVALID_ACTION_TRANSITION`, `409 ACTION_LOCKED`, `409 TICKET_NOT_ACTIVE`,
@@ -430,8 +433,10 @@ into `main`, `reviewer.md` and `ai-use.md` completed, submission PDF Answer Part
    Lab 3 status endpoint to keep its contract backward compatible.
 7. **Intentional contract changes (affecting earlier tests):**
    - **CHG-01** — the post-login landing route becomes `/dashboard` for every role
-     (was My Tickets / Ticket Queue / User Management). Lab 3 E2E assertions on the
-     landing URL are updated accordingly; nothing else in those tests changes.
+     (was My Tickets / Ticket Queue / User Management). An earlier (Lab 2–3) E2E
+     test may **either** update its post-login landing-URL assertion **or** add
+     exactly one navigation step right after login (`page.goto` or a nav click) to
+     reach the screen it tests. No other change to earlier tests is allowed.
    - **CHG-02** — the resolution gate means a Ticket cannot be resolved without
      recorded work. Lab 3 tests that resolve a Ticket now first create one COMPLETED
      Action Taken in their fixture; their assertions are unchanged.
