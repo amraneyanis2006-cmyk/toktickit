@@ -82,7 +82,7 @@ async function raceAgainst<T>(
   try {
     await prisma.$transaction(
       async (tx) => {
-          // 'UPDATE' stands in for the status endpoint, so it takes the same lock mode.
+        // 'UPDATE' stands in for the status endpoint, so it takes the same lock mode.
         if (mode === 'UPDATE') await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticketId} FOR NO KEY UPDATE`;
         else await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticketId} FOR SHARE`;
         const pidRows = await tx.$queryRaw<Array<{ pid: number }>>`SELECT pg_backend_pid() AS pid`;
@@ -235,6 +235,10 @@ describe('Resolution gate on PATCH /api/staff/tickets/:ticketNumber/status', () 
     );
     expect(res.status).toBe(409);
     expect(res.body.error).toBe('UNASSIGNED_TICKET');
+    const unchanged = await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } });
+    expect(unchanged.currentStatus).toBe('RESOLVED');
+    expect(unchanged.resolvedAt!.toISOString()).toBe(ticket.resolvedAt!.toISOString());
+    expect(await historyCount(ticket.id)).toBe(0);
 
     // spec sec 7.1.3: the gate applies only to new transitions into RESOLVED.
     const legacy = await createTicket(prisma, fx, { status: 'RESOLVED', resolvedAt: new Date('2026-09-01T00:00:00.000Z') });
@@ -387,6 +391,9 @@ describe('Stale and concurrent status changes (BR-17)', () => {
     expect(res.status).toBe(409);
     expect(res.body.error).toBe('STALE_UPDATE');
     expect(res.body.current.currentStatus).toBe('WAITING_FOR_REQUESTER');
+    expect(Object.keys(res.body.current).sort()).toEqual(
+      ['currentStatus', 'legalNextStatuses', 'requesterIndicatedResolved', 'resolvedAt', 'ticketNumber', 'updatedAt'].sort()
+    );
     expect((await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } })).currentStatus).toBe('WAITING_FOR_REQUESTER');
     expect(await historyCount(ticket.id)).toBe(0);
   });
@@ -467,6 +474,16 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
     const row = await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } });
     expect(row.resolvedAt).toBeNull();
     expect(row.requesterIndicatedResolved).toBe(false);
+
+    // RESOLVED -> REOPENED directly also clears resolvedAt and the indication.
+    const direct = await resolvable();
+    await prisma.ticket.update({ where: { id: direct.id }, data: { requesterIndicatedResolved: true } });
+    expect((await changeStatus(direct.ticketNumber, { currentStatus: 'RESOLVED' })).status).toBe(200);
+    const directReopen = await changeStatus(direct.ticketNumber, { currentStatus: 'REOPENED' });
+    expect(directReopen.status).toBe(200);
+    expect(directReopen.body.resolvedAt).toBeNull();
+    expect(directReopen.body.requesterIndicatedResolved).toBe(false);
+    expect(await historyCount(direct.id)).toBe(2);
 
     // Resolving again after a reopen sets a fresh resolvedAt.
     expect((await changeStatus(ticket.ticketNumber, { currentStatus: 'IN_PROGRESS' })).status).toBe(200);

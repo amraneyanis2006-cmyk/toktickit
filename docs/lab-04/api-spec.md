@@ -236,8 +236,8 @@ The UI initialises its `role` and `isActive` filters from the URL
   the ticket's latest summary in the 200 shape without `statusChange`
   (`ticketNumber`, `currentStatus`, `requesterIndicatedResolved`, `resolvedAt`,
   `updatedAt`, `legalNextStatuses`).
-- **400 `VALIDATION_ERROR`** with `fields.currentStatus` (missing/unknown value) or
-  `fields.expectedUpdatedAt` (sent but not an ISO-8601 date-time with a time zone).
+- **400 `VALIDATION_ERROR`** with `fields.currentStatus` (missing/unknown value) and/or
+  `fields.expectedUpdatedAt` (all invalid fields at once) (sent but not an ISO-8601 date-time with a time zone).
 - **500 `INTERNAL_ERROR`** a lock wait longer than the 15 s transaction timeout
   (known limitation).
 

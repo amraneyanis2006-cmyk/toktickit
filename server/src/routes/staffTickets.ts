@@ -449,6 +449,7 @@ router.patch(
           const actions = await tx.actionTaken.findMany({ where: { ticketId: ticket.id }, select: { status: true } });
           // The owner was checked just above, so UNASSIGNED cannot be among these blockers.
           const gate = computeResolutionGate(locked, actions);
+          if (gate.blockers.includes('UNASSIGNED')) return { unassigned: true } as const;
           const blockers = gate.blockers.filter((b): b is 'NO_COMPLETED_ACTION' | 'OPEN_ACTIONS' => b !== 'UNASSIGNED');
           if (blockers.length > 0) return { blocked: blockers } as const;
         }
