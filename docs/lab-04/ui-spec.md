@@ -148,6 +148,10 @@ top-down.
   below it so it is not lost).
 - `422 INVALID_ASSIGNEE` → error under Performed by: "This person can't be assigned
   (inactive or not IT Staff)."
+- `409 TICKET_NOT_ACTIVE` (the ticket was resolved, closed or cancelled meanwhile) →
+  `zg-callout-error` in the panel: "This ticket is no longer active, so its actions can't
+  be changed."; the panel closes on dismiss and the Ticket Detail reloads (typed values
+  stay visible until then).
 
 **Requester Ticket Detail:** same list, read-only (no buttons), title "Work done on
 your ticket"; no Created-by column (shows Performed by only).

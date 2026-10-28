@@ -98,7 +98,8 @@ an empty key (Lab 3 AC-09). Another Requester's Ticket → `404 NOT_FOUND`.
 `ticketId` are **never** read from the body (BR-01, BR-04). `status` is always
 `PLANNED` on creation.
 - **201** → `ActionTaken`.
-- **200** → the existing `ActionTaken`, unchanged, when the same `clientRequestId` was
+- **200** → the existing `ActionTaken` in its current state, unchanged by the replay, when the
+  same `clientRequestId` was
   already used on this Ticket **with the same payload** (idempotent replay, BR-18). The
   replay is answered before the `TICKET_NOT_ACTIVE` check and returns the action in its
   current state (e.g. CANCELLED after a ticket-cancel cascade). Check order: ticket (404) →

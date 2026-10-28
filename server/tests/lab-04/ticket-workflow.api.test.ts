@@ -645,7 +645,7 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
       expect(row.cancelledAt!.toISOString()).toBe(res.body.statusChange.changedAt);
       expect(row.updatedAt.toISOString()).toBe(res.body.statusChange.changedAt);
     }
-    expect(byId.get(done.id)).toMatchObject({ status: 'COMPLETED', updatedAt: done.updatedAt, cancelledAt: null });
+    expect(byId.get(done.id)).toMatchObject({ status: 'COMPLETED', updatedAt: done.updatedAt, cancelledAt: null, completedAt: done.completedAt, result: done.result });
     expect(byId.get(dropped.id)).toMatchObject({ status: 'CANCELLED', updatedAt: dropped.updatedAt, cancelledAt: dropped.cancelledAt });
 
     // The cascade applies from every status that can move to CANCELLED.
@@ -736,6 +736,25 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
     expect(await historyCount(ticket.id)).toBe(0);
   });
 
+  it('WF-09: a cancel refused on the locked row (status changed while it waited) leaves the open actions untouched', async () => {
+    const ticket = await createTicket(prisma, fx);
+    const open = await addAction(ticket.id, 'PLANNED');
+    const res = await raceAgainst(
+      ticket.id,
+      'UPDATE',
+      (tx) => tx.ticket.update({ where: { id: ticket.id }, data: { currentStatus: 'WAITING_FOR_REQUESTER' } }),
+      () => changeStatus(ticket.ticketNumber, { currentStatus: 'CANCELLED', expectedUpdatedAt: ticket.updatedAt.toISOString() })
+    );
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('STALE_UPDATE');
+    expect(await prisma.actionTaken.findUniqueOrThrow({ where: { id: open.id } })).toMatchObject({
+      status: 'PLANNED',
+      updatedAt: open.updatedAt,
+      cancelledAt: null,
+    });
+    expect(await historyCount(ticket.id)).toBe(0);
+  });
+
   it('WF-09: a cancel refused with STALE_UPDATE leaves the open actions untouched', async () => {
     const ticket = await createTicket(prisma, fx);
     const open = await addAction(ticket.id, 'PLANNED');
@@ -775,6 +794,32 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ id: originalId, status: 'CANCELLED' });
     expect(await prisma.actionTaken.count({ where: { ticketId: ticket.id } })).toBe(1);
+
+    // Same race, but the retry carries a different payload: IDEMPOTENCY_KEY_REUSED with the original.
+    const other = await createTicket(prisma, fx);
+    const otherBody = { ...body, clientRequestId: randomUUID() };
+    let otherId!: number;
+    const reused = await raceAgainst(
+      other.id,
+      'UPDATE',
+      async (tx) => {
+        const original = await tx.actionTaken.create({
+          data: {
+            ticketId: other.id, clientRequestId: otherBody.clientRequestId, actionAt: new Date(otherBody.actionAt),
+            description: otherBody.description, status: 'PLANNED', performedById: fx.staffA.id, createdById: fx.staffA.id,
+          },
+        });
+        otherId = original.id;
+        const at = new Date();
+        await tx.ticket.update({ where: { id: other.id }, data: { currentStatus: 'CANCELLED' } });
+        await tx.actionTaken.update({ where: { id: original.id }, data: { status: 'CANCELLED', cancelledAt: at, updatedAt: at } });
+      },
+      () => request(app).post(`/api/staff/tickets/${other.ticketNumber}/actions`).set('Cookie', staffCookie).send({ ...otherBody, description: 'A different payload' })
+    );
+    expect(reused.status).toBe(409);
+    expect(reused.body.error).toBe('IDEMPOTENCY_KEY_REUSED');
+    expect(reused.body.current).toMatchObject({ id: otherId, status: 'CANCELLED' });
+    expect(await prisma.actionTaken.count({ where: { ticketId: other.id } })).toBe(1);
   });
 
   it('WF-09: an open action committed while the cancel waits on the lock is cancelled by it', async () => {
