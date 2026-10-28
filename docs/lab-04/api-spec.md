@@ -101,9 +101,12 @@ an empty key (Lab 3 AC-09). Another Requester's Ticket → `404 NOT_FOUND`.
 - **200** → the existing `ActionTaken`, unchanged, when the same `clientRequestId` was
   already used on this Ticket **with the same payload** (idempotent replay, BR-18). The
   replay is answered before the `TICKET_NOT_ACTIVE` check and returns the action in its
-  current state (e.g. CANCELLED after a ticket-cancel cascade). Check order: validation
-  (400) → ticket (404) → replay (200) / `IDEMPOTENCY_KEY_REUSED` → `TICKET_NOT_ACTIVE` →
-  `INVALID_ASSIGNEE` → create (the active status is re-checked on the share-locked row).
+  current state (e.g. CANCELLED after a ticket-cancel cascade). Check order: ticket (404) →
+  validation (400, needs the ticket's creation time) → replay (200) /
+  `IDEMPOTENCY_KEY_REUSED` → `TICKET_NOT_ACTIVE` → `INVALID_ASSIGNEE` → create. Inside the
+  write transaction the active status is re-checked on the share-locked row; if the
+  ticket became inactive, the key is looked up again first, so a retry whose original
+  committed meanwhile still gets the replay (BR-18 before BR-10).
 - **409 `IDEMPOTENCY_KEY_REUSED`** the same `clientRequestId` was already used on this
   Ticket with a **different** payload (any of `actionAt`, `description`, `result`,
   `followUpRequired`, `followUpNote`, `attachmentNotes`, `performedById`, compared after
@@ -123,7 +126,7 @@ an empty key (Lab 3 AC-09). Another Requester's Ticket → `404 NOT_FOUND`.
 ## 5. PATCH /api/staff/tickets/:ticketNumber/actions/:actionId 🔒S
 
 Edit and/or assign an **open** Action Taken. Partial update: only supplied fields
-change. Check order: validation (400) → ticket/action (404) → `TICKET_NOT_ACTIVE` (BR-10, also for actions a
+change. Check order: ticket/action (404) → validation (400) → `TICKET_NOT_ACTIVE` (BR-10, also for actions a
 ticket cancel has cancelled) → `ACTION_LOCKED` → `STALE_UPDATE` → `INVALID_ASSIGNEE`;
 the ticket row is share-locked before the action row is written (§8).
 - **Request**
@@ -151,7 +154,7 @@ the ticket row is share-locked before the action row is written (§8).
 
 ## 6. PATCH /api/staff/tickets/:ticketNumber/actions/:actionId/status 🔒S
 
-Check order after validation: `TICKET_NOT_ACTIVE` → `ACTION_LOCKED` → `STALE_UPDATE` →
+Check order: ticket/action (404) → validation (400) → `TICKET_NOT_ACTIVE` → `ACTION_LOCKED` → `STALE_UPDATE` →
 `INVALID_ACTION_TRANSITION` → Result required for COMPLETED (the `400 fields.result` comes
 last because it depends on the stored Result).
 
@@ -214,11 +217,11 @@ The UI initialises its `role` and `isActive` filters from the URL
   `UNASSIGNED_TICKET`) → resolution gate for RESOLVED (409 `RESOLUTION_BLOCKED`) →
   conditional update
   `WHERE id = :id AND currentStatus = :readStatus` (plus `AND updatedAt =
-  :expectedUpdatedAt` when the token is sent; 0 rows → 409 `STALE_UPDATE`),
-  set/clear `resolvedAt`, clear `requesterIndicatedResolved` on REOPENED, on CANCELLED
-  set every PLANNED/IN_PROGRESS Action Taken of the ticket to CANCELLED (`cancelledAt`
-  = the change time, BR-13), insert `TicketStatusChange` (the conditional update is defence in depth behind the
-  locked-row re-check). Every Action Taken write
+  :expectedUpdatedAt` when the token is sent; 0 rows → 409 `STALE_UPDATE`; defence in
+  depth behind the locked-row re-check), set/clear `resolvedAt`, clear
+  `requesterIndicatedResolved` on REOPENED, on CANCELLED set every PLANNED/IN_PROGRESS
+  Action Taken of the ticket to CANCELLED (`cancelledAt` = the change time, BR-13),
+  insert `TicketStatusChange`. Every Action Taken write
   (`POST …/actions`, `PATCH …/actions/:actionId`, `PATCH …/actions/:actionId/status`)
   takes a share lock on the same ticket row (design rule: every transaction that
   writes Action Taken rows locks the ticket row first, which keeps the cancel cascade

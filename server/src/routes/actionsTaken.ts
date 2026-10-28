@@ -214,8 +214,18 @@ router.post('/staff/tickets/:ticketNumber/actions', ...staffOnly, async (req: Re
       const created = await prisma.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticket.id} FOR SHARE`;
         const fresh = await tx.ticket.findUniqueOrThrow({ where: { id: ticket.id }, select: { currentStatus: true } });
-        if (!isActiveTicketStatus(fresh.currentStatus as TicketStatus)) return null;
-        return tx.actionTaken.create({
+        if (!isActiveTicketStatus(fresh.currentStatus as TicketStatus)) {
+          // BR-18 before BR-10: the original of a retried request may have
+          // committed while this one waited on the lock (e.g. behind a cancel).
+          const original = clientRequestId
+            ? await tx.actionTaken.findUnique({
+                where: { ticketId_clientRequestId: { ticketId: ticket.id, clientRequestId } },
+                include: ACTION_TAKEN_INCLUDE,
+              })
+            : null;
+          return original ? ({ replay: original } as const) : ({ inactive: true } as const);
+        }
+        const row = await tx.actionTaken.create({
           data: {
             ticketId: ticket.id,
             createdById: req.user!.id,
@@ -231,9 +241,11 @@ router.post('/staff/tickets/:ticketNumber/actions', ...staffOnly, async (req: Re
           },
           include: ACTION_TAKEN_INCLUDE,
         });
+        return { created: row } as const;
       }, LOCKING_TX_OPTIONS);
-      if (!created) return ticketNotActive(res);
-      return res.status(201).json(toActionTaken(created));
+      if ('inactive' in created) return ticketNotActive(res);
+      if ('replay' in created) return replayResponse(res, created.replay, samePayload(created.replay, data, performedById));
+      return res.status(201).json(toActionTaken(created.created));
     } catch (error) {
       // Two parallel requests with the same key: the unique index lets only
       // one insert through; the other returns the row that won (BR-18).

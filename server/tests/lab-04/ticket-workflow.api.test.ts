@@ -750,6 +750,33 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
     expect(await historyCount(ticket.id)).toBe(0);
   });
 
+  it('WF-09: a retried create blocked behind a cancel that committed the original returns the replay, not TICKET_NOT_ACTIVE', async () => {
+    const ticket = await createTicket(prisma, fx);
+    const body = { actionAt: new Date(Date.now() - 60_000).toISOString(), description: 'Retried create', followUpRequired: false, clientRequestId: randomUUID() };
+    let originalId!: number;
+    const res = await raceAgainst(
+      ticket.id,
+      'UPDATE',
+      // The original create committed and the ticket was cancelled (cascade) before the retry gets the lock.
+      async (tx) => {
+        const original = await tx.actionTaken.create({
+          data: {
+            ticketId: ticket.id, clientRequestId: body.clientRequestId, actionAt: new Date(body.actionAt),
+            description: body.description, status: 'PLANNED', performedById: fx.staffA.id, createdById: fx.staffA.id,
+          },
+        });
+        originalId = original.id;
+        const at = new Date();
+        await tx.ticket.update({ where: { id: ticket.id }, data: { currentStatus: 'CANCELLED' } });
+        await tx.actionTaken.update({ where: { id: original.id }, data: { status: 'CANCELLED', cancelledAt: at, updatedAt: at } });
+      },
+      () => request(app).post(`/api/staff/tickets/${ticket.ticketNumber}/actions`).set('Cookie', staffCookie).send(body)
+    );
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ id: originalId, status: 'CANCELLED' });
+    expect(await prisma.actionTaken.count({ where: { ticketId: ticket.id } })).toBe(1);
+  });
+
   it('WF-09: an open action committed while the cancel waits on the lock is cancelled by it', async () => {
     const ticket = await createTicket(prisma, fx);
     let created!: { id: number };
