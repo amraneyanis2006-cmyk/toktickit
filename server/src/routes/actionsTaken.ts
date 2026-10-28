@@ -9,6 +9,7 @@ import type { ActionStatus } from '../utils/actionTransition';
 import { ACTION_LIMITS, parseIsoDateTime, validateActionFields } from '../utils/actionValidation';
 import type { ActionFieldErrors } from '../utils/actionValidation';
 import { ACTION_TAKEN_INCLUDE, ACTION_TAKEN_ORDER, toActionTaken } from '../utils/ticketHistory';
+import { LOCKING_TX_OPTIONS } from '../utils/transactions';
 
 // Actions Taken (docs/lab-04/api-spec.md sec 3-6, specification.md BR-01..BR-10,
 // BR-17..BR-19). IT Staff and Administrators only; there is deliberately no
@@ -94,8 +95,6 @@ async function staleUpdate(res: Response, actionId: number) {
  * Conditional update on the updatedAt the client last saw (BR-17): if another
  * request changed the row in between, 0 rows match and nothing is written.
  */
-/** Interactive transactions may wait on a ticket row lock; keep them well above Prisma's 5 s default. */
-export const LOCKING_TX_OPTIONS = { maxWait: 10_000, timeout: 15_000 };
 
 async function updateIfUnchanged(
   ticketId: number,

@@ -304,7 +304,7 @@ each with drill-down `/staff/tickets?status=<S>` or
 | Status | Codes |
 |---|---|
 | 200 | idempotent replay of an Action Taken create |
-| 400 | `VALIDATION_ERROR` (Action Taken fields, unknown status in list filter, missing `expectedUpdatedAt`) |
+| 400 | `VALIDATION_ERROR` (Action Taken fields, unknown status in list filter, missing `expectedUpdatedAt` on Action Taken updates, invalid `currentStatus` or `expectedUpdatedAt` on the ticket status change) |
 | 409 | `RESOLUTION_BLOCKED`, `STALE_UPDATE`, `INVALID_ACTION_TRANSITION`, `ACTION_LOCKED`, `TICKET_NOT_ACTIVE`, `IDEMPOTENCY_KEY_REUSED` (+ Lab 3 codes) |
 | 422 | `INVALID_ASSIGNEE` (+ Lab 3 `INVALID_OWNER`) |
 | 503 | `GET /api/health/db` with database unreachable |

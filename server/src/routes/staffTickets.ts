@@ -8,7 +8,7 @@ import type { TicketStatus } from '../utils/statusTransition';
 import { TICKET_HISTORY_INCLUDE, toActionTaken, toStatusChange } from '../utils/ticketHistory';
 import { computeResolutionGate } from '../utils/resolutionGate';
 import { parseIsoDateTime } from '../utils/actionValidation';
-import { LOCKING_TX_OPTIONS } from './actionsTaken';
+import { LOCKING_TX_OPTIONS } from '../utils/transactions';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -335,9 +335,9 @@ router.patch(
 // PATCH /api/staff/tickets/:ticketNumber/status - change Current Status
 // (Lab 4 api-spec.md sec 8, BR-11..BR-17). Processing order is binding:
 // validate -> 404 -> stale check (optional expectedUpdatedAt) -> matrix ->
-// UNASSIGNED_TICKET -> resolution gate -> one transaction that updates only if
-// the status is still the one read (0 rows -> STALE_UPDATE) and appends one
-// TicketStatusChange.
+// UNASSIGNED_TICKET -> one transaction: lock the ticket row, re-check status,
+// token and owner on the locked row, resolution gate, conditional update
+// (0 rows -> STALE_UPDATE), append one TicketStatusChange.
 // --------------------------------------------------
 const VALID_STATUSES = Object.values(TicketStatusEnum) as TicketStatus[];
 
@@ -436,13 +436,16 @@ router.patch(
         const locked = await tx.ticket.findUniqueOrThrow({ where: { id: ticket.id } });
         if (locked.currentStatus !== current) throw new StaleStatusError();
         if (expected && locked.updatedAt.getTime() !== expected.getTime()) throw new StaleStatusError();
+        // BR-12(a) on the locked row, not on the earlier read.
+        if ((target === 'RESOLVED' || target === 'CLOSED') && locked.ticketOwnerId === null) {
+          return { unassigned: true } as const;
+        }
         const now = new Date(Math.max(Date.now(), locked.updatedAt.getTime() + 1));
         if (target === 'RESOLVED') {
           const actions = await tx.actionTaken.findMany({ where: { ticketId: ticket.id }, select: { status: true } });
+          // The owner was checked just above, so UNASSIGNED cannot be among these blockers.
           const gate = computeResolutionGate(locked, actions);
-          // UNASSIGNED was already answered with UNASSIGNED_TICKET above.
-          const blockers = gate.blockers.filter((b) => b !== 'UNASSIGNED');
-          if (blockers.length > 0) return { blocked: blockers } as const;
+          if (!gate.canResolve) return { blocked: gate.blockers } as const;
         }
 
         const { count } = await tx.ticket.updateMany({
@@ -466,6 +469,12 @@ router.patch(
         return { updated, statusChange } as const;
       }, LOCKING_TX_OPTIONS);
 
+      if ('unassigned' in result) {
+        return res.status(409).json({
+          error: 'UNASSIGNED_TICKET',
+          message: 'An unassigned ticket cannot be resolved or closed.',
+        });
+      }
       if ('blocked' in result) {
         const parts = result.blocked.map((b) => BLOCKER_MESSAGES[b]).filter(Boolean);
         return res.status(409).json({

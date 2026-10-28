@@ -83,22 +83,28 @@ async function raceAgainst<T>(
     async (tx) => {
       if (mode === 'UPDATE') await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticketId} FOR UPDATE`;
       else await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticketId} FOR SHARE`;
+      const pidRows = await tx.$queryRaw<Array<{ pid: number }>>`SELECT pg_backend_pid() AS pid`;
+      const pid = pidRows[0]!.pid;
       await change(tx);
       pending = Promise.resolve(fire());
-      await waitForBlockedRequest();
+      await waitForBlockedBy(pid);
     },
     { timeout: 15000 }
   );
   return pending;
 }
 
-/** Proves the interleaving: waits until another backend is waiting for a row lock (fails after 8 s). */
-async function waitForBlockedRequest() {
+/**
+ * Proves the interleaving: waits until some backend is blocked by THIS
+ * transaction (pg_blocking_pids), i.e. the request under test is waiting on the
+ * ticket row lock held above. Fails after 8 s.
+ */
+async function waitForBlockedBy(holderPid: number) {
   const deadline = Date.now() + 8000;
   for (;;) {
-    const rows = await prisma.$queryRaw<Array<{ waiting: number }>>`
-      SELECT count(*)::int AS waiting FROM pg_locks WHERE NOT granted`;
-    if ((rows[0]?.waiting ?? 0) > 0) return;
+    const rows = await prisma.$queryRaw<Array<{ blocked: number }>>`
+      SELECT count(*)::int AS blocked FROM pg_stat_activity WHERE ${holderPid}::int = ANY(pg_blocking_pids(pid))`;
+    if ((rows[0]?.blocked ?? 0) > 0) return;
     if (Date.now() > deadline) throw new Error('The request never waited on the ticket row lock - interleaving not forced.');
     await new Promise((r) => setTimeout(r, 25));
   }
@@ -136,6 +142,7 @@ describe('Resolution gate on PATCH /api/staff/tickets/:ticketNumber/status', () 
       expect(res.status).toBe(409);
       expect(res.body.error).toBe('RESOLUTION_BLOCKED');
       expect(res.body.blockers).toEqual(['OPEN_ACTIONS']);
+      expect(res.body.message).toBe('This ticket cannot be resolved yet: complete or cancel the open actions.');
       const row = await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } });
       expect(row.currentStatus).toBe('IN_PROGRESS');
       expect(await historyCount(ticket.id)).toBe(0);
@@ -147,6 +154,7 @@ describe('Resolution gate on PATCH /api/staff/tickets/:ticketNumber/status', () 
     expect(res.status).toBe(409);
     expect(res.body.error).toBe('RESOLUTION_BLOCKED');
     expect(res.body.blockers).toEqual(['NO_COMPLETED_ACTION', 'OPEN_ACTIONS']);
+    expect(res.body.message).toBe('This ticket cannot be resolved yet: complete at least one action and complete or cancel the open actions.');
     expect((await prisma.ticket.findUniqueOrThrow({ where: { id: both.id } })).currentStatus).toBe('IN_PROGRESS');
     expect(await historyCount(both.id)).toBe(0);
 
@@ -194,6 +202,20 @@ describe('Resolution gate on PATCH /api/staff/tickets/:ticketNumber/status', () 
     expect(res.body.error).toBe('TICKET_NOT_ACTIVE');
     const open = await prisma.actionTaken.count({ where: { ticketId: ticket.id, status: { in: ['PLANNED', 'IN_PROGRESS'] } } });
     expect(open).toBe(0);
+  });
+
+  it('WF-02: an owner removed while a resolve waits on the lock is 409 UNASSIGNED_TICKET (checked on the locked row)', async () => {
+    const ticket = await resolvable();
+    const res = await raceAgainst(
+      ticket.id,
+      'UPDATE',
+      (tx) => tx.ticket.update({ where: { id: ticket.id }, data: { ticketOwnerId: null } }),
+      () => changeStatus(ticket.ticketNumber, { currentStatus: 'RESOLVED' })
+    );
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('UNASSIGNED_TICKET');
+    expect((await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } })).currentStatus).toBe('IN_PROGRESS');
+    expect(await historyCount(ticket.id)).toBe(0);
   });
 
   it('WF-03: resolving when the gate is met sets RESOLVED, resolvedAt, exactly one history row, and the api-spec sec 8 shape', async () => {
@@ -295,6 +317,11 @@ describe('Stale and concurrent status changes (BR-17)', () => {
     expect(invalidToken.status).toBe(400);
     expect(invalidToken.body.error).toBe('VALIDATION_ERROR');
     expect(invalidToken.body.fields.expectedUpdatedAt).toBeDefined();
+    for (const token of [123, {}, true, '2026-10-28T03:40:12']) {
+      const bad = await changeStatus(ticket.ticketNumber, { currentStatus: 'IN_PROGRESS', expectedUpdatedAt: token });
+      expect(bad.status, JSON.stringify(token)).toBe(400);
+      expect(bad.body.fields.expectedUpdatedAt, JSON.stringify(token)).toBeDefined();
+    }
 
     for (const body of [{}, { currentStatus: 'FOO' }, { currentStatus: 42 }]) {
       const bad = await changeStatus(ticket.ticketNumber, body);
@@ -340,6 +367,8 @@ describe('Stale and concurrent status changes (BR-17)', () => {
     expect(await historyCount(ticket.id)).toBe(0);
   });
 
+  // Outcome check under real parallelism; the 0-row conditional-update path itself is
+  // proven deterministically by the forced-race WF-05 tests above.
   it('WF-05: two parallel transitions - exactly one succeeds and exactly one history row is written', async () => {
     for (const withToken of [false, true]) {
       const ticket = await resolvable();
