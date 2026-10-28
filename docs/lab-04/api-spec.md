@@ -99,7 +99,9 @@ an empty key (Lab 3 AC-09). Another Requester's Ticket → `404 NOT_FOUND`.
 `PLANNED` on creation.
 - **201** → `ActionTaken`.
 - **200** → the existing `ActionTaken`, unchanged, when the same `clientRequestId` was
-  already used on this Ticket **with the same payload** (idempotent replay, BR-18).
+  already used on this Ticket **with the same payload** (idempotent replay, BR-18). The
+  replay is answered before the `TICKET_NOT_ACTIVE` check and returns the action in its
+  current state (e.g. CANCELLED after a ticket-cancel cascade).
 - **409 `IDEMPOTENCY_KEY_REUSED`** the same `clientRequestId` was already used on this
   Ticket with a **different** payload (any of `actionAt`, `description`, `result`,
   `followUpRequired`, `followUpNote`, `attachmentNotes`, `performedById`, compared after

@@ -164,10 +164,11 @@ your ticket"; no Created-by column (shows Performed by only).
 - The backend stays the authority: a `409 RESOLUTION_BLOCKED` /
   `INVALID_TRANSITION` / `STALE_UPDATE` shows a `zg-callout-error` with the
   server message, the selection is reset, and the Ticket reloads.
-- **Success** refreshes the summary in place: status badge, "Resolved on …", legal
-  next statuses, Status History - and, after CANCELLED, the Actions Taken section
-  (the Ticket Detail is reloaded, since the cancel also cancelled the open actions) -
-  and shows an inline success callout
+- **Success** refreshes the summary in place (status badge, "Resolved on …", legal
+  next statuses, Status History); after CANCELLED the whole Ticket Detail is reloaded
+  (summary, history and Actions Taken, since the cancel also cancelled the open
+  actions). The dialog's open-action count is informational (from the loaded detail).
+  The UI then shows an inline success callout
   (`zg-callout-info`, `role="status"`), e.g. "Status changed to Resolved." There is no
   toast component.
 - **Awaiting review banner** (`zg-callout-info` + `zg-badge-awaiting-review`) at the top

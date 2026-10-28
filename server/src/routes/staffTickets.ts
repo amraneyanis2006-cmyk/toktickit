@@ -9,6 +9,7 @@ import { TICKET_HISTORY_INCLUDE, toActionTaken, toStatusChange } from '../utils/
 import { computeResolutionGate } from '../utils/resolutionGate';
 import { parseIsoDateTime } from '../utils/actionValidation';
 import { LOCKING_TX_OPTIONS } from '../utils/transactions';
+import { OPEN_ACTION_STATUSES } from '../utils/actionTransition';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -474,7 +475,7 @@ router.patch(
         // on a ticket where BR-10 forbids any further action write.
         if (target === 'CANCELLED') {
           await tx.actionTaken.updateMany({
-            where: { ticketId: ticket.id, status: { in: ['PLANNED', 'IN_PROGRESS'] } },
+            where: { ticketId: ticket.id, status: { in: [...OPEN_ACTION_STATUSES] } },
             data: { status: 'CANCELLED', cancelledAt: now, updatedAt: now },
           });
         }

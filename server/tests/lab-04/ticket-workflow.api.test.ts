@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
+import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
 import type { Prisma, TicketStatus } from '@prisma/client';
 import app from '../../src/app';
@@ -644,7 +645,7 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
     expect(await prisma.actionTaken.count({ where: { ticketId: ticket.id, status: { in: ['PLANNED', 'IN_PROGRESS'] } } })).toBe(0);
     expect(await historyCount(ticket.id)).toBe(1);
 
-    // Other transitions never touch actions (every legal non-cancel move an open action allows).
+    // Other transitions never touch actions (a representative walk through non-cancel moves).
     const other = await createTicket(prisma, fx, { status: 'NEW' });
     const stays = await addAction(other.id, 'PLANNED');
     for (const to of ['OPEN', 'IN_PROGRESS', 'WAITING_FOR_REQUESTER', 'IN_PROGRESS'] as const) {
@@ -659,23 +660,80 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
     });
   });
 
-  it('WF-09: a cancel rejected inside the transaction leaves the open actions untouched (same transaction)', async () => {
+  it('WF-09: a failure after the cascade rolls everything back - status, actions and history (BR-13, BR-16 same transaction)', async () => {
     const ticket = await createTicket(prisma, fx);
     const open = await addAction(ticket.id, 'IN_PROGRESS');
-    const res = await raceAgainst(
-      ticket.id,
-      'UPDATE',
-      (tx) => tx.ticket.update({ where: { id: ticket.id }, data: { currentStatus: 'WAITING_FOR_REQUESTER' } }),
-      () => changeStatus(ticket.ticketNumber, { currentStatus: 'CANCELLED' })
+    // Fault injection: a temporary trigger makes the history insert fail for this
+    // ticket only, i.e. after the status update and the action cascade ran in the tx.
+    const fn = `l4wf_fail_history_${ticket.id}`;
+    await prisma.$executeRawUnsafe(
+      `CREATE FUNCTION ${fn}() RETURNS trigger AS $$ BEGIN IF NEW."ticketId" = ${ticket.id} THEN RAISE EXCEPTION 'injected failure'; END IF; RETURN NEW; END $$ LANGUAGE plpgsql`
     );
-    expect(res.status).toBe(409);
-    expect(res.body.error).toBe('STALE_UPDATE');
+    try {
+      await prisma.$executeRawUnsafe(`CREATE TRIGGER ${fn} BEFORE INSERT ON "TicketStatusChange" FOR EACH ROW EXECUTE FUNCTION ${fn}()`);
+      const res = await changeStatus(ticket.ticketNumber, { currentStatus: 'CANCELLED' });
+      expect(res.status).toBe(500);
+      expect(res.body).toEqual({ error: 'INTERNAL_ERROR', message: expect.any(String) });
+    } finally {
+      await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS ${fn} ON "TicketStatusChange"`);
+      await prisma.$executeRawUnsafe(`DROP FUNCTION IF EXISTS ${fn}()`);
+    }
+    const row = await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } });
+    expect(row.currentStatus).toBe('IN_PROGRESS');
+    expect(row.updatedAt.toISOString()).toBe(ticket.updatedAt.toISOString());
     expect(await prisma.actionTaken.findUniqueOrThrow({ where: { id: open.id } })).toMatchObject({
       status: 'IN_PROGRESS',
       updatedAt: open.updatedAt,
       cancelledAt: null,
     });
     expect(await historyCount(ticket.id)).toBe(0);
+  });
+
+  it('WF-09: an open action committed while the cancel waits on the lock is cancelled by it', async () => {
+    const ticket = await createTicket(prisma, fx);
+    let created!: { id: number };
+    const res = await raceAgainst(
+      ticket.id,
+      'SHARE',
+      async (tx) => {
+        created = await tx.actionTaken.create({
+          data: { ticketId: ticket.id, actionAt: new Date(), description: 'Started during the cancel', status: 'IN_PROGRESS', performedById: fx.staffA.id, createdById: fx.staffA.id },
+        });
+      },
+      () => changeStatus(ticket.ticketNumber, { currentStatus: 'CANCELLED' })
+    );
+    expect(res.status).toBe(200);
+    const row = await prisma.actionTaken.findUniqueOrThrow({ where: { id: created.id } });
+    expect(row.status).toBe('CANCELLED');
+    expect(row.cancelledAt!.toISOString()).toBe(res.body.statusChange.changedAt);
+    expect(await prisma.actionTaken.count({ where: { ticketId: ticket.id, status: { in: ['PLANNED', 'IN_PROGRESS'] } } })).toBe(0);
+  });
+
+  it('WF-09: on a RESOLVED or CLOSED ticket, writes to a finished action are TICKET_NOT_ACTIVE (BR-10 before BR-09)', async () => {
+    for (const status of ['RESOLVED', 'CLOSED'] as const) {
+      const ticket = await createTicket(prisma, fx, { status, resolvedAt: new Date() });
+      const done = await addAction(ticket.id, 'COMPLETED');
+      const url = `/api/staff/tickets/${ticket.ticketNumber}/actions/${done.id}`;
+      const token = done.updatedAt.toISOString();
+      const edit = await request(app).patch(url).set('Cookie', staffCookie).send({ expectedUpdatedAt: token, description: 'x' });
+      const move = await request(app).patch(`${url}/status`).set('Cookie', staffCookie).send({ status: 'CANCELLED', expectedUpdatedAt: token });
+      for (const r of [edit, move]) {
+        expect(r.status, status).toBe(409);
+        expect(r.body.error, status).toBe('TICKET_NOT_ACTIVE');
+      }
+    }
+  });
+
+  it('WF-09: replaying a create after the cancel returns the original action in its current (cancelled) state', async () => {
+    const ticket = await createTicket(prisma, fx);
+    const body = { actionAt: new Date().toISOString(), description: 'Created before the cancel', followUpRequired: false, clientRequestId: randomUUID() };
+    const first = await request(app).post(`/api/staff/tickets/${ticket.ticketNumber}/actions`).set('Cookie', staffCookie).send(body);
+    expect(first.status).toBe(201);
+    expect((await changeStatus(ticket.ticketNumber, { currentStatus: 'CANCELLED' })).status).toBe(200);
+    const replay = await request(app).post(`/api/staff/tickets/${ticket.ticketNumber}/actions`).set('Cookie', staffCookie).send(body);
+    expect(replay.status).toBe(200);
+    expect(replay.body).toMatchObject({ id: first.body.id, status: 'CANCELLED' });
+    expect(await prisma.actionTaken.count({ where: { ticketId: ticket.id } })).toBe(1);
   });
 
   it('WF-09: a Ticket without actions can be CANCELLED, and CANCELLED is terminal', async () => {

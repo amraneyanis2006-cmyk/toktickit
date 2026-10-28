@@ -17,6 +17,9 @@ export function isValidActionTransition(from: ActionStatus, to: ActionStatus): b
   return TRANSITIONS[from]?.includes(to) ?? false;
 }
 
+/** Open Actions (BR-22). */
+export const OPEN_ACTION_STATUSES: readonly ActionStatus[] = ['PLANNED', 'IN_PROGRESS'];
+
 /** Open Actions (BR-22): the ones that still block resolution and can be edited. */
 export function isOpenActionStatus(status: ActionStatus): boolean {
   return status === 'PLANNED' || status === 'IN_PROGRESS';

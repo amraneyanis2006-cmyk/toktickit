@@ -121,7 +121,7 @@ final demonstration.
 | BR-05 | **Performed by** ("auto") defaults to the creator. It may be re-assigned only to an **active** user whose role is IT Staff or Administrator; any other value is rejected with `422 INVALID_ASSIGNEE` and nothing is saved. |
 | BR-06 | **Action Date/Time** is required (the form pre-fills "now"); it must not be earlier than the Ticket's creation time (compared at minute precision, the resolution of the form's `datetime-local` value) nor later than the server time + 5 minutes; it is sent as ISO-8601 with a time zone. Stored in UTC, displayed in the viewer's local time zone. |
 | BR-07 | Field rules (trimmed): Action Description required, 1–2000 characters. Result optional while the action is open, **required (1–2000) to complete it**. Follow-up Note **required (1–1000) when Follow-Up Required is true**, and stored as `null` when it is false. Attachment Notes optional, ≤ 500 characters, plain text describing which file to look at (e.g. an attachment file name); it is not an upload. |
-| BR-08 | Action Taken status transitions: PLANNED → IN_PROGRESS, COMPLETED, CANCELLED; IN_PROGRESS → COMPLETED, CANCELLED; COMPLETED and CANCELLED are terminal: any status change on them → `409 ACTION_LOCKED` (checked first, BR-09). Any other move not listed (between open states, e.g. IN_PROGRESS → PLANNED, PLANNED → PLANNED) → `409 INVALID_ACTION_TRANSITION`. Completing sets `completedAt`; cancelling sets `cancelledAt`. The only other way an action becomes CANCELLED is the ticket-cancel cascade of BR-13. |
+| BR-08 | Action Taken status transitions: PLANNED → IN_PROGRESS, COMPLETED, CANCELLED; IN_PROGRESS → COMPLETED, CANCELLED; COMPLETED and CANCELLED are terminal: any status change on them → `409 ACTION_LOCKED` (checked first among the action rules - after BR-10 `TICKET_NOT_ACTIVE` - BR-09). Any other move not listed (between open states, e.g. IN_PROGRESS → PLANNED, PLANNED → PLANNED) → `409 INVALID_ACTION_TRANSITION`. Completing sets `completedAt`; cancelling sets `cancelledAt`. The only other way an action becomes CANCELLED is the ticket-cancel cascade of BR-13. |
 | BR-09 | **Append-only:** Actions Taken are never deleted (no DELETE endpoint). A COMPLETED or CANCELLED Action Taken is immutable (`409 ACTION_LOCKED`); a correction is recorded as a new Action Taken. Public Comments, Internal Notes, and Status History entries are also append-only. |
 | BR-10 | Actions Taken can be created or edited only while the Ticket is active (NEW, OPEN, IN_PROGRESS, WAITING_FOR_REQUESTER, REOPENED); otherwise `409 TICKET_NOT_ACTIVE`. To work on a Resolved or Closed Ticket, IT Staff reopen it first. |
 
@@ -343,7 +343,9 @@ seed tickets.
 - No RESOLVED, CLOSED, or CANCELLED seed ticket has a PLANNED or IN_PROGRESS Action Taken
   (BR-10/BR-13; checked by MIG-04). Existing data needs no repair: Actions Taken exist
   only since this sprint and no open action sits on an inactive ticket (checked on the
-  dev database when BR-13 was amended).
+  dev database when BR-13 was amended with: `SELECT count(*) FROM "ActionTaken" a JOIN
+  "Ticket" t ON t.id = a."ticketId" WHERE a.status IN ('PLANNED','IN_PROGRESS') AND
+  t."currentStatus" IN ('RESOLVED','CLOSED','CANCELLED')` → 0).
 - Credentials stay local-development-only (README).
 
 ## 8. API Contract
@@ -477,4 +479,5 @@ into `main`, `reviewer.md` and `ai-use.md` completed, submission PDF Answer Part
    in the status transaction (BR-13, cross-referenced from BR-08), so no action stays
    open on a ticket where BR-10 forbids further action writes; action writes on an
    inactive ticket answer `TICKET_NOT_ACTIVE` before `ACTION_LOCKED`/`STALE_UPDATE`.
-   These tighten BR-12, BR-13 and BR-17; no rule is relaxed.
+   These tighten BR-10, BR-12, BR-13 and BR-17, and on inactive tickets give BR-10
+   `TICKET_NOT_ACTIVE` precedence over BR-08/BR-09 `ACTION_LOCKED`; no rule is relaxed.
