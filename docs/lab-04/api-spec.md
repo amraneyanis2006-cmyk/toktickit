@@ -100,7 +100,7 @@ an empty key (Lab 3 AC-09). Another Requester's Ticket → `404 NOT_FOUND`.
 - **200** → the existing `ActionTaken` when the same `clientRequestId` was already
   used on this Ticket (idempotent replay, BR-18).
 - **400 `VALIDATION_ERROR`** with `fields` (all invalid fields at once):
-  `actionAt` (missing, not ISO-8601, before ticket creation, > now + 5 min),
+  `actionAt` (missing, not ISO-8601 with a time zone, before the minute of ticket creation, > now + 5 min),
   `description` (empty / > 2000), `result` (> 2000), `followUpNote` (required when
   `followUpRequired` is true; > 1000), `attachmentNotes` (> 500),
   `clientRequestId` (not a UUID).
