@@ -469,7 +469,7 @@ router.patch(
         // concurrent change, so this guard should never fire.
         if (count === 0) throw new StaleStatusError();
 
-        // BR-13 (decision for Issue #62): cancelling a Ticket also cancels its
+        // BR-13 (owner decision on PR #70): cancelling a Ticket also cancels its
         // open Actions Taken, in this same transaction, so no action is left open
         // on a ticket where BR-10 forbids any further action write.
         if (target === 'CANCELLED') {

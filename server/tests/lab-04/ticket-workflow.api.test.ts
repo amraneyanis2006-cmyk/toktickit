@@ -617,18 +617,65 @@ describe('Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16)', () => {
       const row = byId.get(open.id)!;
       expect(row.status).toBe('CANCELLED');
       expect(row.cancelledAt!.toISOString()).toBe(res.body.statusChange.changedAt);
-      expect(row.updatedAt.getTime()).toBeGreaterThan(open.updatedAt.getTime());
+      expect(row.updatedAt.toISOString()).toBe(res.body.statusChange.changedAt);
     }
     expect(byId.get(done.id)).toMatchObject({ status: 'COMPLETED', updatedAt: done.updatedAt, cancelledAt: null });
-    expect(byId.get(dropped.id)).toMatchObject({ status: 'CANCELLED', updatedAt: dropped.updatedAt });
+    expect(byId.get(dropped.id)).toMatchObject({ status: 'CANCELLED', updatedAt: dropped.updatedAt, cancelledAt: dropped.cancelledAt });
+
+    // The serialized detail shows the cascade (staff and Requester).
+    const staffDetail = await request(app).get(`/api/staff/tickets/${ticket.ticketNumber}`).set('Cookie', staffCookie);
+    const own = await request(app).get(`/api/tickets/${ticket.ticketNumber}`).set('Cookie', await loginAs(fx.requesterA.email));
+    for (const detail of [staffDetail, own]) {
+      const shown = detail.body.actionsTaken.find((a: { id: number }) => a.id === planned.id);
+      expect(shown).toMatchObject({ status: 'CANCELLED', cancelledAt: res.body.statusChange.changedAt });
+    }
+
+    // A write sent after the cancel committed, with the pre-cancel token, is
+    // TICKET_NOT_ACTIVE (checked before ACTION_LOCKED and STALE_UPDATE) and changes nothing.
+    const actionUrl = `/api/staff/tickets/${ticket.ticketNumber}/actions/${planned.id}`;
+    const token = planned.updatedAt.toISOString();
+    const lateEdit = await request(app).patch(actionUrl).set('Cookie', staffCookie).send({ expectedUpdatedAt: token, description: 'late' });
+    const lateStatus = await request(app).patch(`${actionUrl}/status`).set('Cookie', staffCookie).send({ status: 'IN_PROGRESS', expectedUpdatedAt: token });
+    for (const late of [lateEdit, lateStatus]) {
+      expect(late.status).toBe(409);
+      expect(late.body.error).toBe('TICKET_NOT_ACTIVE');
+    }
+    expect((await prisma.actionTaken.findUniqueOrThrow({ where: { id: planned.id } })).updatedAt.toISOString()).toBe(res.body.statusChange.changedAt);
     expect(await prisma.actionTaken.count({ where: { ticketId: ticket.id, status: { in: ['PLANNED', 'IN_PROGRESS'] } } })).toBe(0);
     expect(await historyCount(ticket.id)).toBe(1);
 
-    // Other transitions never touch actions.
-    const other = await createTicket(prisma, fx);
+    // Other transitions never touch actions (every legal non-cancel move an open action allows).
+    const other = await createTicket(prisma, fx, { status: 'NEW' });
     const stays = await addAction(other.id, 'PLANNED');
+    for (const to of ['OPEN', 'IN_PROGRESS', 'WAITING_FOR_REQUESTER', 'IN_PROGRESS'] as const) {
+      expect((await changeStatus(other.ticketNumber, { currentStatus: to })).status, to).toBe(200);
+    }
+    await prisma.ticket.update({ where: { id: other.id }, data: { currentStatus: 'REOPENED' } });
     expect((await changeStatus(other.ticketNumber, { currentStatus: 'WAITING_FOR_REQUESTER' })).status).toBe(200);
-    expect((await prisma.actionTaken.findUniqueOrThrow({ where: { id: stays.id } })).status).toBe('PLANNED');
+    expect(await prisma.actionTaken.findUniqueOrThrow({ where: { id: stays.id } })).toMatchObject({
+      status: 'PLANNED',
+      updatedAt: stays.updatedAt,
+      cancelledAt: null,
+    });
+  });
+
+  it('WF-09: a cancel rejected inside the transaction leaves the open actions untouched (same transaction)', async () => {
+    const ticket = await createTicket(prisma, fx);
+    const open = await addAction(ticket.id, 'IN_PROGRESS');
+    const res = await raceAgainst(
+      ticket.id,
+      'UPDATE',
+      (tx) => tx.ticket.update({ where: { id: ticket.id }, data: { currentStatus: 'WAITING_FOR_REQUESTER' } }),
+      () => changeStatus(ticket.ticketNumber, { currentStatus: 'CANCELLED' })
+    );
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('STALE_UPDATE');
+    expect(await prisma.actionTaken.findUniqueOrThrow({ where: { id: open.id } })).toMatchObject({
+      status: 'IN_PROGRESS',
+      updatedAt: open.updatedAt,
+      cancelledAt: null,
+    });
+    expect(await historyCount(ticket.id)).toBe(0);
   });
 
   it('WF-09: a Ticket without actions can be CANCELLED, and CANCELLED is terminal', async () => {

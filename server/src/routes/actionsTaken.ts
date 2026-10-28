@@ -269,8 +269,10 @@ router.patch('/staff/tickets/:ticketNumber/actions/:actionId', ...staffOnly, asy
     const expected = readExpectedUpdatedAt(body, fields);
     if (Object.keys(fields).length > 0 || !expected) return validationError(res, fields);
 
-    if (isLockedActionStatus(action.status as ActionStatus)) return actionLocked(res);
+    // BR-10 first: on an inactive ticket every action write is TICKET_NOT_ACTIVE,
+    // also for actions a ticket cancel has just cancelled (BR-13).
     if (!isActiveTicketStatus(ticket.currentStatus as TicketStatus)) return ticketNotActive(res);
+    if (isLockedActionStatus(action.status as ActionStatus)) return actionLocked(res);
     if (expected.getTime() !== action.updatedAt.getTime()) return staleUpdate(res, action.id);
 
     const performedById = typeof body.performedById === 'number' ? body.performedById : undefined;
@@ -316,10 +318,12 @@ router.patch('/staff/tickets/:ticketNumber/actions/:actionId/status', ...staffOn
     const expected = readExpectedUpdatedAt(body, fields);
     if (Object.keys(fields).length > 0 || !expected) return validationError(res, fields);
 
-    // A completed or cancelled action is immutable (BR-09), checked before the
-    // transition rule, which then only covers moves between open states.
-    if (isLockedActionStatus(action.status as ActionStatus)) return actionLocked(res);
+    // On an active ticket a completed or cancelled action is immutable (BR-09),
+    // checked before the transition rule, which then only covers open states.
+    // BR-10 first: on an inactive ticket every action write is TICKET_NOT_ACTIVE,
+    // also for actions a ticket cancel has just cancelled (BR-13).
     if (!isActiveTicketStatus(ticket.currentStatus as TicketStatus)) return ticketNotActive(res);
+    if (isLockedActionStatus(action.status as ActionStatus)) return actionLocked(res);
     if (expected.getTime() !== action.updatedAt.getTime()) return staleUpdate(res, action.id);
 
     const from = action.status as ActionStatus;

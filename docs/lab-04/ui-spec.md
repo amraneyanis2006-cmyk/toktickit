@@ -158,13 +158,16 @@ your ticket"; no Created-by column (shows Performed by only).
   `legalNextStatuses`; "Resolved" stays visible but **disabled** when
   `resolutionGate.canResolve` is false, with the reason underneath:
   "To resolve, complete at least one action and close all open actions." or
-  "Assign a Ticket Owner first.". CANCELLED keeps its confirmation dialog; when the Ticket has open actions the dialog
-  says they will be cancelled too ("This also cancels n open action(s).").
+  "Assign a Ticket Owner first.". CANCELLED keeps its confirmation dialog; when the Ticket has open actions
+  (PLANNED or IN_PROGRESS in `actionsTaken`) the dialog adds "This also cancels 1 open
+  action." or "This also cancels {n} open actions." (n ≥ 2); with none, no extra line.
 - The backend stays the authority: a `409 RESOLUTION_BLOCKED` /
   `INVALID_TRANSITION` / `STALE_UPDATE` shows a `zg-callout-error` with the
   server message, the selection is reset, and the Ticket reloads.
 - **Success** refreshes the summary in place: status badge, "Resolved on …", legal
-  next statuses, Status History, and shows an inline success callout
+  next statuses, Status History - and, after CANCELLED, the Actions Taken section
+  (the Ticket Detail is reloaded, since the cancel also cancelled the open actions) -
+  and shows an inline success callout
   (`zg-callout-info`, `role="status"`), e.g. "Status changed to Resolved." There is no
   toast component.
 - **Awaiting review banner** (`zg-callout-info` + `zg-badge-awaiting-review`) at the top
@@ -209,7 +212,7 @@ each at desktop 1280, tablet 768, and mobile 320 unless stated:
 - [ ] Requester Dashboard: populated, empty (Requester with no Tickets), failure.
 - [ ] Drill-down: card → filtered Queue / My Tickets with the same count.
 - [ ] Actions Taken: list with several actions on one Ticket, create panel, validation errors (follow-up note, future date), inactive-assignee rejection, edit, start, complete (with result), cancel dialog, locked action, stale-update message, Requester read-only view.
-- [ ] Workflow: legal options only, Resolved disabled with reason, RESOLUTION_BLOCKED message, successful resolve with refreshed summary and history, awaiting-review banner.
+- [ ] Workflow: legal options only, Resolved disabled with reason, RESOLUTION_BLOCKED message, successful resolve with refreshed summary and history, awaiting-review banner, cancel dialog with the open-actions line and the Actions Taken list refreshed after the cancel.
 - [ ] Regression: login, My Tickets, Ticket Detail with attachments and comments, Ticket Queue, Internal Notes, User Management.
 
 **Visual consistency checklist** (completed before submission): design consistency

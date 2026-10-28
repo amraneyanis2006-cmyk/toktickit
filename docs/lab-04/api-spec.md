@@ -119,7 +119,9 @@ an empty key (Lab 3 AC-09). Another Requester's Ticket → `404 NOT_FOUND`.
 ## 5. PATCH /api/staff/tickets/:ticketNumber/actions/:actionId 🔒S
 
 Edit and/or assign an **open** Action Taken. Partial update: only supplied fields
-change.
+change. Check order after validation: `TICKET_NOT_ACTIVE` (BR-10, also for actions a
+ticket cancel has cancelled) → `ACTION_LOCKED` → `STALE_UPDATE` → `INVALID_ASSIGNEE`;
+the ticket row is share-locked before the action row is written (§8).
 - **Request**
 ```json
 {
@@ -143,6 +145,9 @@ change.
 - **422 `INVALID_ASSIGNEE`** (BR-05).
 
 ## 6. PATCH /api/staff/tickets/:ticketNumber/actions/:actionId/status 🔒S
+
+Check order after validation: `TICKET_NOT_ACTIVE` → `ACTION_LOCKED` → `STALE_UPDATE` →
+`INVALID_ACTION_TRANSITION` → Result required for COMPLETED.
 
 - **Request** `{ "status": "COMPLETED", "result": "Fixed after reboot.", "expectedUpdatedAt": "…" }`
   (`result` optional if already stored; required for COMPLETED when the stored result
@@ -208,7 +213,8 @@ The UI initialises its `role` and `isActive` filters from the URL
   = the change time, BR-13), insert `TicketStatusChange` (the conditional update is defence in depth behind the
   locked-row re-check). Every Action Taken write
   (`POST …/actions`, `PATCH …/actions/:actionId`, `PATCH …/actions/:actionId/status`)
-  takes a share lock on the same ticket row
+  takes a share lock on the same ticket row (always the ticket row first, then the
+  action rows, in every transaction, so the cancel cascade cannot deadlock)
   and re-reads its status in its own transaction, so a concurrent status change and
   action write are serialized: either the gate sees the new open action or the write
   gets `409 TICKET_NOT_ACTIVE`.

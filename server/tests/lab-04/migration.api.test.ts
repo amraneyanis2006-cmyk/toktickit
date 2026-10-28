@@ -166,6 +166,11 @@ describe('Lab 4 migration', () => {
       select: { ticketNumber: true },
     });
     expect(lab4.length).toBeGreaterThanOrEqual(6);
+    // BR-10/BR-13 invariant: no seed ticket in an inactive status has an open action.
+    const openOnInactive = await prisma.actionTaken.count({
+      where: { status: { in: ['PLANNED', 'IN_PROGRESS'] }, ticket: { ...seedTickets, currentStatus: { in: ['RESOLVED', 'CLOSED', 'CANCELLED'] } } },
+    });
+    expect(openOnInactive).toBe(0);
     for (const t of lab4) expect(t.ticketNumber).toMatch(/^TKT-\d{4}-\d{6}$/);
   }, 180_000);
 });
