@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { login } from '../helpers';
 import { E2E_ADMIN, E2E_REQUESTER_EMPTY, E2E_REQUESTER_L4, E2E_STAFF_A, E2E_STAFF_IDLE, FIXTURE_PASSWORD } from '../global-setup';
-import { VIEWPORTS, listTotal, metric, noHorizontalScroll } from './lab4';
+import { API, VIEWPORTS, listTotal, metric, noHorizontalScroll, nothingClipped } from './lab4';
+
+const ACTIVE = 'NEW,OPEN,IN_PROGRESS,WAITING_FOR_REQUESTER,REOPENED';
 
 test.use({ viewport: { width: 1280, height: 900 } });
 
@@ -76,8 +78,12 @@ test.describe('E2E-07: Requester dashboards', () => {
     const recent = page.locator('section', { has: page.getByRole('heading', { name: 'Recently Updated' }) });
     await expect(recent.getByRole('link', { name: /^TKT-/ }).first()).toBeVisible();
     for (const n of await recent.getByRole('link', { name: /^TKT-/ }).allTextContents()) expect(n).toMatch(/^TKT-L4E-/);
-    // The open count is the Requester's own: the Lab 4 fixture tickets are all theirs and all active.
-    expect(Number(await metric(page, 'Open').textContent())).toBeGreaterThanOrEqual(15);
+    // The Open count is the Requester's own: it equals their own active tickets from GET /api/tickets.
+    await expect(async () => {
+      await page.goto('/dashboard');
+      const own = await (await page.request.get(`${API}/tickets?status=${ACTIVE}&pageSize=10`)).json();
+      expect(Number(await metric(page, 'Open').textContent())).toBe(own.pagination.totalItems);
+    }).toPass({ timeout: 30_000 });
   });
 
   test('E2E-07: a Requester with no tickets sees zeros and empty states, not errors', async ({ page }) => {
@@ -103,6 +109,7 @@ test.describe('RESP-01: dashboards at 320 / 768 / 1280', () => {
         await login(page, who.email, FIXTURE_PASSWORD);
         await expect(page.locator('.zg-metric-value')).toHaveCount(cards);
         await noHorizontalScroll(page);
+        await nothingClipped(page, '.zg-card');
         const tops = await page.locator('.zg-metric').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
         const firstRow = tops.filter((t) => t === tops[0]).length;
         expect(firstRow).toBe(vp.width >= 1200 ? cards : vp.width >= 768 ? 2 : 1);

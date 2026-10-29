@@ -109,14 +109,15 @@ scenario('staff dashboard states', E2E_STAFF_A.email, async (page, vp) => {
   await sdFailure(page, vp);
   await page.unroute('**/api/dashboard/staff');
 
-  await page.goto('/dashboard');
-  await dashboardsLoaded(page, 5);
-  const card = page.locator('.zg-metric', { has: page.getByRole('heading', { name: 'Unassigned', exact: true }) });
-  await card.scrollIntoViewIfNeeded();
-  const value = Number(await metric(page, 'Unassigned').textContent());
-  await sdCard(page, vp, false);
-  await page.getByRole('link', { name: 'View all unassigned tickets' }).click();
-  expect(await listTotal(page)).toBe(value);
+  // Retried like E2E-06: other specs may change the counts between the two reads.
+  await expect(async () => {
+    await page.goto('/dashboard');
+    await dashboardsLoaded(page, 5);
+    const value = Number(await metric(page, 'Unassigned').textContent());
+    await sdCard(page, vp, false);
+    await page.getByRole('link', { name: 'View all unassigned tickets' }).click();
+    expect(await listTotal(page)).toBe(value);
+  }).toPass({ timeout: 30_000 });
   await sdList(page, vp);
 });
 
@@ -152,12 +153,14 @@ scenario('requester dashboard states', E2E_REQUESTER_L4.email, async (page, vp) 
   await rdFailure(page, vp);
   await page.unroute('**/api/dashboard/requester');
 
-  await page.goto('/dashboard');
-  await dashboardsLoaded(page, 4);
-  const value = Number(await metric(page, 'Open').textContent());
-  await rdCard(page, vp, false);
-  await page.getByRole('link', { name: 'View all open tickets' }).click();
-  expect(await listTotal(page)).toBe(value);
+  await expect(async () => {
+    await page.goto('/dashboard');
+    await dashboardsLoaded(page, 4);
+    const value = Number(await metric(page, 'Open').textContent());
+    await rdCard(page, vp, false);
+    await page.getByRole('link', { name: 'View all open tickets' }).click();
+    expect(await listTotal(page)).toBe(value);
+  }).toPass({ timeout: 30_000 });
   await rdList(page, vp);
 });
 
@@ -232,7 +235,7 @@ scenario('edit, start, complete, cancel dialog', E2E_STAFF_A.email, async (page,
   await page.getByRole('button', { name: 'Save changes' }).click();
   await expect(page.getByRole('region', { name: 'Action details' })).toBeHidden();
   // Wait for the reloaded list before reopening, so the panel carries the new updatedAt.
-  const row = page.locator('tr, .zg-card', { hasText: desc }).filter({ visible: true }).first();
+  const row = page.locator('tbody tr, .d-lg-none .zg-card', { hasText: desc }).filter({ visible: true }).first();
   await expect(row).toContainText('monitor-serial.jpg');
 
   await viewAction(page, desc);

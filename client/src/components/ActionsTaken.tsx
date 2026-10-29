@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { MouseEvent } from 'react';
 import ActionPanel from './ActionPanel';
 import { formatDateTime, isLocked } from '../utils/actions';
 
@@ -69,6 +70,13 @@ export default function ActionsTaken({
 }) {
   // undefined: no panel; null: create panel; an action: view/edit panel.
   const [panel, setPanel] = useState<ActionTaken | null | undefined>(undefined);
+  // ui-spec sec 9: focus returns to the button that opened the panel. It is captured on click,
+  // because the button is disabled while the panel is open and a disabled button loses focus.
+  const opener = useRef<HTMLElement | null>(null);
+  const open = (e: MouseEvent<HTMLElement>, p: ActionTaken | null) => { opener.current = e.currentTarget; setPanel(p); };
+  useEffect(() => {
+    if (panel === undefined) opener.current?.focus();
+  }, [panel]);
   const sorted = [...actions].sort((a, b) => a.actionAt.localeCompare(b.actionAt) || a.id - b.id);
   const title = readOnly ? 'Work done on your ticket' : `Actions Taken (${actions.length})`;
 
@@ -76,8 +84,8 @@ export default function ActionsTaken({
     <section className="mb-4">
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h2 className="h6 mb-0">{title}</h2>
-        {!readOnly && canAdd && panel === undefined && (
-          <button type="button" className="btn btn-sm btn-zg-primary" onClick={() => setPanel(null)}>Add Action</button>
+        {!readOnly && canAdd && (
+          <button type="button" className="btn btn-sm btn-zg-primary" disabled={panel !== undefined} onClick={(e) => open(e, null)}>Add Action</button>
         )}
       </div>
 
@@ -119,7 +127,7 @@ export default function ActionsTaken({
                     <td><FollowUp action={a} /></td>
                     <td className="small" style={{ wordBreak: 'break-word' }}>{a.attachmentNotes}</td>
                     {!readOnly && (
-                      <td><button type="button" className="btn btn-sm btn-zg-secondary" disabled={panel !== undefined} onClick={() => setPanel(a)} aria-label={`View action: ${a.description}`}>View</button></td>
+                      <td><button type="button" className="btn btn-sm btn-zg-secondary" disabled={panel !== undefined} onClick={(e) => open(e, a)} aria-label={`View action: ${a.description}`}>View</button></td>
                     )}
                   </tr>
                 ))}
@@ -139,7 +147,7 @@ export default function ActionsTaken({
                 {a.attachmentNotes && <div className="small"><span className="zg-label d-inline">Attachment notes: </span>{a.attachmentNotes}</div>}
                 <FollowUp action={a} />
                 {!readOnly && (
-                  <button type="button" className="btn btn-sm btn-zg-secondary w-100 mt-2" style={{ minHeight: 44 }} disabled={panel !== undefined} onClick={() => setPanel(a)} aria-label={`View action: ${a.description}`}>View</button>
+                  <button type="button" className="btn btn-sm btn-zg-secondary w-100 mt-2" style={{ minHeight: 44 }} disabled={panel !== undefined} onClick={(e) => open(e, a)} aria-label={`View action: ${a.description}`}>View</button>
                 )}
               </div>
             ))}

@@ -70,11 +70,9 @@ export default function ActionPanel({
   const onlyResultDirty = current !== null && JSON.stringify({ ...form, result: '' }) === JSON.stringify({ ...formFrom(current, currentUser.id), result: '' });
   const headingRef = useRef<HTMLHeadingElement>(null);
 
-  // ui-spec sec 9: focus moves into the panel and returns to the opener when it closes.
+  // ui-spec sec 9: focus moves into the panel (ActionsTaken returns it to the opener on close).
   useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
     headingRef.current?.focus();
-    return () => opener?.focus();
   }, []);
   const performers = [...staffUsers];
   for (const u of [currentUser, ...(current ? [current.performedBy] : [])]) {

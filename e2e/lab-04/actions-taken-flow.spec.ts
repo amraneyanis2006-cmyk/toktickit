@@ -151,6 +151,29 @@ test.describe('A11Y-01: keyboard-only Actions Taken', () => {
   });
 });
 
+test.describe('A11Y-01: mobile sheet keyboard', () => {
+  test('A11Y-01: on the < 768 px sheet Tab and Shift+Tab stay inside the panel, Esc closes it and focus returns to View', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await login(page, E2E_STAFF_A.email, FIXTURE_PASSWORD);
+    await openStaffTicket(page, L4.severalActions);
+    const opener = page.getByRole('button', { name: 'View action: Update the access point firmware' }).filter({ visible: true });
+    await opener.click();
+    const sheet = page.getByRole('region', { name: 'Action details' });
+    const inside = () => sheet.evaluate((el) => el.contains(document.activeElement));
+    for (let i = 0; i < 20; i++) {
+      await page.keyboard.press('Tab');
+      expect(await inside()).toBe(true);
+    }
+    for (let i = 0; i < 5; i++) {
+      await page.keyboard.press('Shift+Tab');
+      expect(await inside()).toBe(true);
+    }
+    await page.keyboard.press('Escape');
+    await expect(sheet).toBeHidden();
+    await expect(opener).toBeFocused();
+  });
+});
+
 test.describe('FAIL-02: action save network failure', () => {
   test('FAIL-02: a lost response keeps the typed values, and the second Save creates exactly one action', async ({ page }) => {
     await login(page, E2E_STAFF_A.email, FIXTURE_PASSWORD);

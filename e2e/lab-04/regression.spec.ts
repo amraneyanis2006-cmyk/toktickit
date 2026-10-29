@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { login } from '../helpers';
-import { E2E_ADMIN, E2E_REQUESTER_L4, E2E_STAFF_B, FIXTURE_PASSWORD } from '../global-setup';
+import { E2E_ADMIN, E2E_REQUESTER_A, E2E_STAFF_B, FIXTURE_PASSWORD } from '../global-setup';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const image = path.join(__dirname, '../lab-02/fixtures/test-image.png');
@@ -14,8 +14,8 @@ test.describe('E2E-08: final regression across roles', () => {
     page.on('dialog', (d) => d.accept('E2E-08 removal reason.'));
     const summary = `E2E-08 regression ${Date.now()}`;
 
-    // Requester: create, search, attachment add/remove, Public Comment.
-    await login(page, E2E_REQUESTER_L4.email, FIXTURE_PASSWORD);
+    // Requester A (not the Lab 4 Requester, whose dashboard E2E-07 checks in parallel).
+    await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
     await page.getByRole('link', { name: 'Create Ticket', exact: true }).click();
     await page.waitForSelector('#category');
     await page.selectOption('#category', { index: 1 });
@@ -42,7 +42,7 @@ test.describe('E2E-08: final regression across roles', () => {
     await expect(page.getByText('E2E-08 requester comment.')).toBeVisible();
 
     // Logout blocks the app again.
-    await page.getByRole('button', { name: /E2E Requester L4/ }).click();
+    await page.getByRole('button', { name: /E2E Requester A/ }).click();
     await page.getByRole('button', { name: 'Logout' }).click();
     await page.waitForURL('**/login');
     await page.goto('/tickets');

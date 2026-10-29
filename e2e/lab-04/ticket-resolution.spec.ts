@@ -43,7 +43,7 @@ test.describe('E2E-05: Requester says resolved, staff review', () => {
     await expect(page.getByRole('button', { name: 'You indicated this is resolved' })).toBeDisabled();
 
     await login(page, E2E_STAFF_A.email, FIXTURE_PASSWORD);
-    expect(Number(await metric(page, 'Awaiting Review').textContent())).toBeGreaterThanOrEqual(2); // this one + the fixture
+    await expect(metric(page, 'Awaiting Review')).not.toHaveText('0');
     await page.getByRole('link', { name: 'View all tickets awaiting review' }).click();
     await expect(page.getByText(L4.requesterResolves).first()).toBeVisible();
 
@@ -51,5 +51,15 @@ test.describe('E2E-05: Requester says resolved, staff review', () => {
     await expect(page.getByText('Requester says resolved', { exact: true })).toBeVisible();
     await expect(page.getByText('The requester says the problem appears resolved. Review the actions before resolving.')).toBeVisible();
     await expect(page.locator('.zg-badge-status-in_progress').first()).toBeVisible();
+
+    // Only the staff decision changes the status.
+    await addAction(page, 'Confirmed with the Requester');
+    await viewAction(page, 'Confirmed with the Requester');
+    await page.getByLabel(/^Result/).fill('Requester confirmed it works.');
+    await page.getByRole('button', { name: 'Complete' }).click();
+    await expect(page.locator('table tbody tr').first()).toContainText('Completed');
+    await page.getByLabel('Current Status').selectOption('RESOLVED');
+    await expect(page.getByRole('status')).toHaveText('Status changed to Resolved.');
+    await expect(page.getByText('The requester says the problem appears resolved. Review the actions before resolving.')).toBeHidden();
   });
 });

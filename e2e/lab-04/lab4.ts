@@ -15,6 +15,17 @@ export async function noHorizontalScroll(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 }
 
+/** Nothing inside a card sticks out of it (clipped or overflowing content). */
+export async function nothingClipped(page: Page, selector: string) {
+  const clipped = await page.locator(selector).evaluateAll((cards) => cards.flatMap((card) => {
+    const box = card.getBoundingClientRect();
+    return [...card.querySelectorAll('*')]
+      .filter((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && (r.right > box.right + 1 || r.left < box.left - 1); })
+      .map((el) => `${el.tagName} "${(el.textContent ?? '').trim().slice(0, 30)}"`);
+  }));
+  expect(clipped).toEqual([]);
+}
+
 /** Metric card value by its h2 label. */
 export function metric(page: Page, label: string): Locator {
   return page.locator('.zg-metric', { has: page.getByRole('heading', { level: 2, name: label, exact: true }) }).locator('.zg-metric-value');
@@ -73,7 +84,10 @@ export async function setUserActive(email: string, isActive: boolean) {
 /** Presses Tab until `target` has focus (max 60 presses); proves it is reachable by keyboard. */
 export async function tabTo(page: Page, target: Locator) {
   for (let i = 0; i < 60; i++) {
-    if (await target.evaluate((el) => el === document.activeElement)) return;
+    if (await target.evaluate((el) => el === document.activeElement)) {
+      expect(await hasVisibleFocus(page), `visible focus on ${target}`).toBe(true);
+      return;
+    }
     await page.keyboard.press('Tab');
   }
   throw new Error(`Not reachable by Tab: ${target}`);
