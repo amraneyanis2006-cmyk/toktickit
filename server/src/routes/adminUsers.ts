@@ -93,8 +93,18 @@ router.get(
           { email: { contains: search, mode: 'insensitive' } },
         ];
       }
-      // Lab 4 drill-down (api-spec sec 7.3): optional isActive=true|false.
-      if (req.query.isActive === 'true' || req.query.isActive === 'false') where.isActive = req.query.isActive === 'true';
+      // Lab 4 drill-down (api-spec sec 7.3): optional isActive=true|false; anything else is a 400.
+      const isActiveParam = req.query.isActive;
+      if (isActiveParam !== undefined) {
+        if (isActiveParam !== 'true' && isActiveParam !== 'false') {
+          return res.status(400).json({
+            error: 'VALIDATION_ERROR',
+            message: 'Invalid filter.',
+            fields: { isActive: 'isActive must be true or false.' },
+          });
+        }
+        where.isActive = isActiveParam === 'true';
+      }
       if ((ROLES as readonly string[]).includes(roleParam)) {
         where.role = roleParam as RoleValue;
       }

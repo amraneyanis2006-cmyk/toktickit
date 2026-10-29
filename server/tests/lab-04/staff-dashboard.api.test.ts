@@ -135,6 +135,16 @@ describe('GET /api/dashboard/staff', () => {
     }
   });
 
+  it('DASH-09: the users drill-down rejects an invalid isActive with 400 VALIDATION_ERROR (PR #71 review)', async () => {
+    const adminCookie = await loginAs(fx.admin.email);
+    const res = await request(app).get('/api/admin/users?isActive=yes').set('Cookie', adminCookie);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('VALIDATION_ERROR');
+    expect(res.body.fields).toHaveProperty('isActive');
+    // role keeps its Lab 3 behaviour: an unknown role is ignored, not rejected.
+    expect((await request(app).get('/api/admin/users?role=NOPE').set('Cookie', adminCookie)).status).toBe(200);
+  });
+
   it('DASH-10: a staff member with no open actions gets myOpenActions 0 and an empty list', async () => {
     const res = await dashboard(await loginAs(fx.staffB.email));
     expect(res.body.metrics.myOpenActions.value).toBe(0);

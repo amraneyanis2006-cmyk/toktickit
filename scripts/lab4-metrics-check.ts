@@ -13,7 +13,8 @@ import appModule from "../server/src/app";
 const app = ((appModule as unknown as { default?: typeof appModule }).default ?? appModule) as typeof appModule;
 
 const prisma = new PrismaClient();
-const PASSWORD = "DevPass123!"; // local seed accounts only
+// Set LAB4_CHECK_PASSWORD to override; the fallback is the README dev seed password (local only).
+const PASSWORD = process.env.LAB4_CHECK_PASSWORD ?? "DevPass123!";
 const ACTIVE = `('NEW','OPEN','IN_PROGRESS','WAITING_FOR_REQUESTER','REOPENED')`;
 const STATUSES = ["NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "RESOLVED", "CLOSED", "REOPENED", "CANCELLED"];
 
