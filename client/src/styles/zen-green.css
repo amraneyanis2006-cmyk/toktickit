@@ -269,3 +269,11 @@ body {
     min-height: 44px;
   }
 }
+
+/* Lab 4 dashboards (ui-spec sec 3) */
+.zg-metric { padding: 1rem; height: 100%; display: flex; flex-direction: column; gap: 0.25rem; }
+.zg-metric h2 { font-size: 14px; font-weight: 500; color: var(--zg-text-muted); margin: 0; }
+.zg-metric-value { font-size: 32px; font-weight: 600; line-height: 1.2; }
+.zg-metric-attention { border: 2px solid var(--zg-warning); }
+.zg-metric a { margin-top: auto; }
+.zg-chip { background-color: var(--zg-info-bg); color: var(--zg-info-text); }

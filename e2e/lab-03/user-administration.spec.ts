@@ -7,6 +7,7 @@ test.describe('E2E-05: Administrator full user lifecycle', () => {
     const email = `e2e-lifecycle-${Date.now()}@example.com`;
 
     await login(page, E2E_ADMIN.email, FIXTURE_PASSWORD);
+    await page.goto('/admin/users'); // CHG-01: login now lands on /dashboard
     await page.waitForURL('**/admin/users');
 
     // Create.
@@ -60,6 +61,7 @@ test.describe('E2E-05: Administrator full user lifecycle', () => {
 test.describe('E2E-06: Admin safety-rule UI', () => {
   test('self-deactivation and own-role controls are disabled in the running UI, with the reason shown', async ({ page }) => {
     await login(page, E2E_ADMIN.email, FIXTURE_PASSWORD);
+    await page.goto('/admin/users'); // CHG-01: login now lands on /dashboard
     await page.waitForURL('**/admin/users');
 
     await page.getByRole('button', { name: `Edit ${E2E_ADMIN.name}` }).first().click();
@@ -72,6 +74,7 @@ test.describe('E2E-06: Admin safety-rule UI', () => {
 
   test('editing a DIFFERENT user leaves Role and Active enabled', async ({ page }) => {
     await login(page, E2E_ADMIN.email, FIXTURE_PASSWORD);
+    await page.goto('/admin/users'); // CHG-01: login now lands on /dashboard
     await page.waitForURL('**/admin/users');
 
     await page.getByPlaceholder('Search by name or email...').fill(E2E_STAFF_A.email);
@@ -88,6 +91,7 @@ test.describe('AC-18, RESP-02: Administrator User Management at <768px', () => {
   test('renders as cards with a full-screen create/edit sheet, no horizontal scroll', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await login(page, E2E_ADMIN.email, FIXTURE_PASSWORD);
+    await page.goto('/admin/users'); // CHG-01: login now lands on /dashboard
     await page.waitForURL('**/admin/users');
 
     await expect(page.locator('.table-responsive.d-none.d-md-block')).toBeHidden();

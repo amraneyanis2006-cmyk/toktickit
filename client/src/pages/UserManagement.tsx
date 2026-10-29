@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { DashboardChip } from '../components/DashboardParts';
 import type { FormEvent, KeyboardEvent } from 'react';
 import { apiFetch, ApiError } from '../api/apiClient';
 import { useAuth } from '../context/AuthContext';
@@ -376,12 +377,18 @@ export default function UserManagement() {
   const [fetchState, setFetchState] = useState<FetchState>('loading');
   const latestRequestId = useRef(0);
   const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
+  // Lab 4 drill-down (ui-spec sec 5): the User Accounts card opens this list with role/isActive in the URL.
+  // ponytail: reads window.location, not useSearchParams, because a Lab 3 test renders this page
+  // without a Router; switch to useSearchParams once that test may change.
+  const [searchParams] = useState(() => new URLSearchParams(window.location.search));
+  const [roleFilter, setRoleFilter] = useState(() => searchParams.get('role') ?? '');
+  const [activeFilter, setActiveFilter] = useState(() => searchParams.get('isActive') ?? '');
+  const [fromDashboard, setFromDashboard] = useState(() => searchParams.has('role') || searchParams.has('isActive'));
   const [activeAdminCount, setActiveAdminCount] = useState<number | null>(null);
   const [panel, setPanel] = useState<PanelState>(null);
   const [notice, setNotice] = useState('');
 
-  const filtersActive = Boolean(search.trim() || roleFilter);
+  const filtersActive = Boolean(search.trim() || roleFilter || activeFilter);
 
   const loadUsers = useCallback(async () => {
     const requestId = ++latestRequestId.current;
@@ -390,6 +397,7 @@ export default function UserManagement() {
       const params = new URLSearchParams();
       if (search.trim()) params.set('search', search.trim());
       if (roleFilter) params.set('role', roleFilter);
+      if (activeFilter) params.set('isActive', activeFilter);
       const qs = params.toString();
       const data = await apiFetch<UserRow[]>(`/admin/users${qs ? `?${qs}` : ''}`);
       if (requestId !== latestRequestId.current) return; // a newer request has already superseded this one
@@ -398,7 +406,7 @@ export default function UserManagement() {
     } catch {
       if (requestId === latestRequestId.current) setFetchState('error');
     }
-  }, [search, roleFilter]);
+  }, [search, roleFilter, activeFilter]);
 
   // Separate, UNFILTERED request: the "last active Administrator" lock must not depend on
   // the current search/role filter. UX only - the server enforces BR-22 regardless.
@@ -422,6 +430,9 @@ export default function UserManagement() {
   const clearFilters = () => {
     setSearch('');
     setRoleFilter('');
+    setActiveFilter('');
+    setFromDashboard(false);
+    window.history.replaceState(window.history.state, '', window.location.pathname);
   };
 
   const handleSaved = (message: string) => {
@@ -453,6 +464,8 @@ export default function UserManagement() {
           </button>
         </div>
       )}
+
+      {fromDashboard && <DashboardChip onRemove={clearFilters} />}
 
       <div className="row g-2 mb-4">
         <div className="col-12 col-md-6">

@@ -12,12 +12,13 @@ import StaffTicketQueue from './pages/StaffTicketQueue';
 import StaffTicketDetail from './pages/StaffTicketDetail';
 import UserManagement from './pages/UserManagement';
 import { defaultRouteForRole } from './utils/roleRoutes';
+import Dashboard from './pages/Dashboard';
 
 function RootRedirect() {
   const { user, status } = useAuth();
   if (status === 'loading') return null;
   if (!user) return <Navigate to="/login" replace />;
-  return <Navigate to={defaultRouteForRole(user.role)} replace />;
+  return <Navigate to={defaultRouteForRole()} replace />;
 }
 
 export default function App() {
@@ -31,6 +32,7 @@ export default function App() {
             <Route path="/change-password" element={<ChangePassword />} />
 
             <Route element={<AppShell />}>
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route element={<RequireRole allowedRoles={['REQUESTER']} />}>
                 <Route path="/tickets" element={<MyTickets />} />
                 <Route path="/tickets/new" element={<CreateTicket />} />

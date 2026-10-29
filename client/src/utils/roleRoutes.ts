@@ -1,18 +1,7 @@
-import type { AuthUser } from '../context/AuthContext';
-
 /**
- * Where a user lands after login / at "/" (App.tsx RootRedirect), based on role:
- * Requester -> My Tickets, IT Staff -> Ticket Queue, Administrator -> User
- * Management (their primary function; Ticket Queue stays in their navigation).
+ * Where a user lands after login / at "/" (App.tsx RootRedirect) and after a
+ * forbidden route: every role lands on its Dashboard (Lab 4 CHG-01, BR-28).
  */
-export function defaultRouteForRole(role: AuthUser['role']): string {
-  switch (role) {
-    case 'ADMINISTRATOR':
-      return '/admin/users';
-    case 'IT_STAFF':
-      return '/staff/tickets';
-    case 'REQUESTER':
-    default:
-      return '/tickets';
-  }
+export function defaultRouteForRole(): string {
+  return '/dashboard';
 }

@@ -49,6 +49,7 @@ test.describe('Checklist: IT Staff Ticket Queue states', () => {
     test(`populated at ${bp.name}`, async ({ page }) => {
       await page.setViewportSize({ width: bp.width, height: bp.height });
       await login(page, E2E_STAFF_A.email, FIXTURE_PASSWORD);
+      await page.goto('/staff/tickets'); // CHG-01: login now lands on /dashboard
       await page.waitForURL('**/staff/tickets');
       await page.screenshot({ path: `artifacts/lab-03/screenshots/staff-queue/${bp.name}-populated.png`, fullPage: true });
     });
@@ -56,6 +57,7 @@ test.describe('Checklist: IT Staff Ticket Queue states', () => {
     test(`filtered at ${bp.name}`, async ({ page }) => {
       await page.setViewportSize({ width: bp.width, height: bp.height });
       await login(page, E2E_STAFF_A.email, FIXTURE_PASSWORD);
+      await page.goto('/staff/tickets'); // CHG-01: login now lands on /dashboard
       await page.waitForURL('**/staff/tickets');
       await page.getByPlaceholder('Search by ticket number or summary...').fill('TKT-E2E');
       await page.waitForSelector('tbody tr:visible, .zg-card.p-3:visible');
@@ -65,6 +67,7 @@ test.describe('Checklist: IT Staff Ticket Queue states', () => {
     test(`no-results at ${bp.name}`, async ({ page }) => {
       await page.setViewportSize({ width: bp.width, height: bp.height });
       await login(page, E2E_STAFF_A.email, FIXTURE_PASSWORD);
+      await page.goto('/staff/tickets'); // CHG-01: login now lands on /dashboard
       await page.waitForURL('**/staff/tickets');
       await page.getByPlaceholder('Search by ticket number or summary...').fill('zzz-no-such-ticket-zzz');
       await page.waitForSelector('text=No tickets match your filters.');
@@ -99,6 +102,7 @@ test.describe('Checklist: Administrator User Management list (search, role filte
     test(`at ${bp.name}`, async ({ page }) => {
       await page.setViewportSize({ width: bp.width, height: bp.height });
       await login(page, E2E_ADMIN.email, FIXTURE_PASSWORD);
+      await page.goto('/admin/users'); // CHG-01: login now lands on /dashboard
       await page.waitForURL('**/admin/users');
       await page.getByPlaceholder('Search by name or email...').fill('e2e');
       await page.getByLabel('Filter by role').selectOption('IT_STAFF');
@@ -113,6 +117,7 @@ test.describe('Checklist: Administrator Create User panel', () => {
     test(`at ${bp.name}`, async ({ page }) => {
       await page.setViewportSize({ width: bp.width, height: bp.height });
       await login(page, E2E_ADMIN.email, FIXTURE_PASSWORD);
+      await page.goto('/admin/users'); // CHG-01: login now lands on /dashboard
       await page.waitForURL('**/admin/users');
       await page.getByRole('button', { name: '+ Create User' }).click();
       await page.getByRole('dialog').waitFor({ state: 'visible' });
@@ -126,6 +131,7 @@ test.describe('Checklist: Administrator Edit User panel, self-deactivation disab
     test(`at ${bp.name}`, async ({ page }) => {
       await page.setViewportSize({ width: bp.width, height: bp.height });
       await login(page, E2E_ADMIN.email, FIXTURE_PASSWORD);
+      await page.goto('/admin/users'); // CHG-01: login now lands on /dashboard
       await page.waitForURL('**/admin/users');
       await page.getByRole('button', { name: `Edit ${E2E_ADMIN.name}` }).first().click();
       const dialog = page.getByRole('dialog');
@@ -147,7 +153,7 @@ test.describe('Checklist: Forbidden-access redirects', () => {
       await page.setViewportSize({ width: bp.width, height: bp.height });
       await login(page, E2E_STAFF_A.email, FIXTURE_PASSWORD);
       await page.goto('/admin/users');
-      await page.waitForURL('**/staff/tickets');
+      await page.waitForURL('**/dashboard'); // CHG-01
       await page.screenshot({ path: `artifacts/lab-03/screenshots/forbidden/${bp.name}-non-admin-to-admin-users.png`, fullPage: true });
     });
 
@@ -155,7 +161,7 @@ test.describe('Checklist: Forbidden-access redirects', () => {
       await page.setViewportSize({ width: bp.width, height: bp.height });
       await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
       await page.goto('/staff/tickets');
-      await page.waitForURL('**/tickets');
+      await page.waitForURL('**/dashboard'); // CHG-01
       await page.screenshot({ path: `artifacts/lab-03/screenshots/forbidden/${bp.name}-non-staff-to-staff-tickets.png`, fullPage: true });
     });
   }

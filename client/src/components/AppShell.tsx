@@ -26,10 +26,15 @@ export default function AppShell() {
 
           <div className="collapse navbar-collapse" id="zgNavContent">
             <ul className="navbar-nav me-auto">
+              <li className="nav-item">
+                <NavLink to="/dashboard" className="nav-link">
+                  🏠 Dashboard
+                </NavLink>
+              </li>
               {user?.role === 'REQUESTER' && (
                 <>
                   <li className="nav-item">
-                    <NavLink to="/tickets" className="nav-link">
+                    <NavLink to="/tickets" end className="nav-link">
                       📄 My Tickets
                     </NavLink>
                   </li>

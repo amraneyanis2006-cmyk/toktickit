@@ -40,7 +40,7 @@ export default function ChangePassword() {
         body: JSON.stringify({ currentPassword, newPassword }),
       });
       await refresh();
-      navigate('/tickets');
+      navigate('/');
     } catch (err) {
       if (err instanceof ApiError && err.fields) {
         setFieldErrors(err.fields);

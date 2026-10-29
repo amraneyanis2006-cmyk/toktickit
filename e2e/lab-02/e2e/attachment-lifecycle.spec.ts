@@ -13,6 +13,7 @@ test.describe('E2E-03: Attachment lifecycle (add, download, remove)', () => {
 
     await page.setViewportSize({ width: 1280, height: 900 });
     await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
+    await page.goto('/tickets'); // CHG-01: login now lands on /dashboard
 
     // Create a fresh ticket so this test doesn't depend on any
     // pre-existing attachment state.
