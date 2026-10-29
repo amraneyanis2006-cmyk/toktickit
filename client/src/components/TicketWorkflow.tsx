@@ -57,10 +57,8 @@ export default function TicketWorkflow({ ticket, onChanged }: { ticket: Workflow
     } catch (err) {
       const code = err instanceof ApiError ? err.code : '';
       setError(err instanceof ApiError ? err.message : 'Unable to update status.');
-      if (['RESOLUTION_BLOCKED', 'INVALID_TRANSITION', 'STALE_UPDATE'].includes(code)) {
-        setChoice('');
-        await onChanged();
-      }
+      setChoice(''); // so the same target can be picked again to retry
+      if (['RESOLUTION_BLOCKED', 'INVALID_TRANSITION', 'STALE_UPDATE', 'UNASSIGNED_TICKET'].includes(code)) await onChanged();
     } finally {
       setBusy(false);
       setConfirmCancel(false);

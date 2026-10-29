@@ -63,12 +63,19 @@ export default function ActionPanel({
   const [needsReload, setNeedsReload] = useState(false);
   const resultRef = useRef<HTMLTextAreaElement>(null);
 
-  const locked = current !== null && isLocked(current);
+  // A concurrent change (locked, ticket inactive) freezes the panel until it is closed and reloaded.
+  const locked = (current !== null && isLocked(current)) || needsReload;
+  const dirty = current !== null && JSON.stringify(form) !== JSON.stringify(formFrom(current, currentUser.id));
+  const performers = [...staffUsers];
+  for (const u of [currentUser, ...(current ? [current.performedBy] : [])]) {
+    if (!performers.some((p) => p.id === u.id)) performers.push(u.id === currentUser.id ? u : { ...u, name: `${u.name} (inactive)` });
+  }
   const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((f) => ({ ...f, [key]: value }));
   const base = `/staff/tickets/${ticketNumber}/actions`;
 
   const validate = () => {
     const e: Record<string, string> = {};
+    if (!form.actionAt || Number.isNaN(new Date(form.actionAt).getTime())) e.actionAt = 'Action Date/Time is required.';
     if (!form.description.trim()) e.description = 'Action Description is required.';
     if (form.followUpRequired && !form.followUpNote.trim()) e.followUpNote = 'Follow-up Note is required when follow-up is needed.';
     setErrors(e);
@@ -84,6 +91,7 @@ export default function ActionPanel({
       setForm(formFrom(latest, currentUser.id));
       setBanner({ kind: 'info', text: MESSAGES.stale });
     } else if (api?.code === 'IDEMPOTENCY_KEY_REUSED' && latest) {
+      setUnsaved(form);
       setCurrent(latest);
       setForm(formFrom(latest, currentUser.id));
       setBanner({ kind: 'info', text: MESSAGES.reused });
@@ -93,8 +101,14 @@ export default function ActionPanel({
     } else if (api?.code === 'TICKET_NOT_ACTIVE') {
       setBanner({ kind: 'error', text: MESSAGES.notActive });
       setNeedsReload(true);
+    } else if (api?.code === 'ACTION_LOCKED' || api?.code === 'INVALID_ACTION_TRANSITION') {
+      setBanner({ kind: 'error', text: api.message });
+      setNeedsReload(true);
     } else if (api?.fields) {
       setErrors(api.fields);
+      const shown = ['actionAt', 'description', 'result', 'performedById', 'attachmentNotes', ...(form.followUpRequired ? ['followUpNote'] : [])];
+      const other = Object.entries(api.fields).filter(([k]) => !shown.includes(k)).map(([, v]) => v);
+      if (other.length) setBanner({ kind: 'error', text: other.join(' ') });
     } else {
       setBanner({ kind: 'error', text: api?.message ?? 'Unable to save the action.' });
     }
@@ -110,6 +124,7 @@ export default function ActionPanel({
       fail(err);
     } finally {
       setBusy(false);
+      setConfirmCancel(false);
     }
   };
 
@@ -125,7 +140,13 @@ export default function ActionPanel({
 
   const save = () => {
     if (!validate()) return;
-    if (current) send(`${base}/${current.id}`, 'PATCH', { ...fields(), expectedUpdatedAt: current.updatedAt });
+    if (current) {
+      const { performedById, ...rest } = fields();
+      // Partial update: re-sending an unchanged (possibly now inactive) performer would fail INVALID_ASSIGNEE.
+      send(`${base}/${current.id}`, 'PATCH', {
+        ...rest, ...(performedById !== current.performedBy.id ? { performedById } : {}), expectedUpdatedAt: current.updatedAt,
+      });
+    }
     else send(base, 'POST', { ...fields(), clientRequestId });
   };
 
@@ -136,7 +157,6 @@ export default function ActionPanel({
       resultRef.current?.focus();
       return;
     }
-    setConfirmCancel(false);
     send(`${base}/${current.id}/status`, 'PATCH', {
       status, ...(status === 'COMPLETED' ? { result: form.result.trim() } : {}), expectedUpdatedAt: current.updatedAt,
     });
@@ -161,7 +181,7 @@ export default function ActionPanel({
   });
 
   return (
-    <div className="zg-card p-3 mb-3" aria-label={current ? 'Action details' : 'New action'} role="region">
+    <div className="zg-card zg-sheet p-3 mb-3" aria-label={current ? 'Action details' : 'New action'} role="region">
       <h3 className="h6">{current ? (locked ? 'Action (locked)' : 'Edit action') : 'Add action'}</h3>
       {banner && <div className={`zg-callout-${banner.kind} p-2 mb-3`} role={banner.kind === 'error' ? 'alert' : 'status'}>{banner.text}</div>}
 
@@ -187,9 +207,10 @@ export default function ActionPanel({
           {field('result', 'Result', (
             <textarea ref={resultRef} className="form-control" rows={2} maxLength={2000} value={form.result} onChange={(e) => set('result', e.target.value)} {...a11y('result')} />
           ))}
+          <div className="text-muted small text-end mb-2" style={{ marginTop: '-0.75rem' }}>{form.result.length}/2000</div>
           {field('performedById', 'Performed by (defaults to you)', (
             <select className="form-select" value={form.performedById} onChange={(e) => set('performedById', e.target.value)} {...a11y('performedById')}>
-              {(staffUsers.some((u) => u.id === currentUser.id) ? staffUsers : [currentUser, ...staffUsers]).map((u) => (
+              {performers.map((u) => (
                 <option key={u.id} value={u.id}>{u.name}</option>
               ))}
             </select>
@@ -201,6 +222,7 @@ export default function ActionPanel({
           {form.followUpRequired && field('followUpNote', 'Follow-up Note', (
             <textarea className="form-control" rows={2} maxLength={1000} value={form.followUpNote} onChange={(e) => set('followUpNote', e.target.value)} {...a11y('followUpNote', true)} />
           ), true)}
+          {form.followUpRequired && <div className="text-muted small text-end mb-2" style={{ marginTop: '-0.75rem' }}>{form.followUpNote.length}/1000</div>}
           {field('attachmentNotes', 'Attachment Notes', (
             <input type="text" className="form-control" maxLength={500} placeholder="Which file shows the evidence, e.g. wifi-error.png" value={form.attachmentNotes} onChange={(e) => set('attachmentNotes', e.target.value)} {...a11y('attachmentNotes')} />
           ))}
@@ -211,7 +233,9 @@ export default function ActionPanel({
         <div className="zg-callout-neutral p-2 mb-3 small">
           <div className="fw-semibold">Your unsaved text:</div>
           <div style={{ whiteSpace: 'pre-wrap' }}>{unsaved.description}</div>
-          {unsaved.result && <div style={{ whiteSpace: 'pre-wrap' }}>{unsaved.result}</div>}
+          {unsaved.result && <div style={{ whiteSpace: 'pre-wrap' }}>Result: {unsaved.result}</div>}
+          {unsaved.followUpNote && <div style={{ whiteSpace: 'pre-wrap' }}>Follow-up Note: {unsaved.followUpNote}</div>}
+          {unsaved.attachmentNotes && <div>Attachment Notes: {unsaved.attachmentNotes}</div>}
         </div>
       )}
 
@@ -222,14 +246,15 @@ export default function ActionPanel({
           </button>
         )}
         {current && !locked && current.status === 'PLANNED' && (
-          <button type="button" className="btn btn-sm btn-zg-secondary" disabled={busy} onClick={() => changeStatus('IN_PROGRESS')}>Start</button>
+          <button type="button" className="btn btn-sm btn-zg-secondary" disabled={busy || dirty} onClick={() => changeStatus('IN_PROGRESS')}>Start</button>
         )}
         {current && !locked && (
           <>
-            <button type="button" className="btn btn-sm btn-zg-secondary" disabled={busy} onClick={() => changeStatus('COMPLETED')}>Complete</button>
-            <button type="button" className="btn btn-sm btn-zg-tertiary" disabled={busy} onClick={() => setConfirmCancel(true)}>Cancel action</button>
+            <button type="button" className="btn btn-sm btn-zg-secondary" disabled={busy || (dirty && form.result === (current.result ?? ''))} onClick={() => changeStatus('COMPLETED')}>Complete</button>
+            <button type="button" className="btn btn-sm btn-zg-tertiary" disabled={busy || dirty} onClick={() => setConfirmCancel(true)}>Cancel action</button>
           </>
         )}
+        {dirty && <span className="small text-muted w-100">Save your changes before starting, completing or cancelling.</span>}
         <button type="button" className="btn btn-sm btn-zg-tertiary ms-auto" onClick={close}>Close</button>
       </div>
 

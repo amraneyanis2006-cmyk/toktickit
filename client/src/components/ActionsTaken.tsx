@@ -81,6 +81,7 @@ export default function ActionsTaken({
 
       {panel !== undefined && !readOnly && currentUser && (
         <ActionPanel
+          key={panel === null ? 'new' : panel.id}
           ticketNumber={ticketNumber}
           action={panel}
           staffUsers={staffUsers}

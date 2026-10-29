@@ -252,3 +252,20 @@ body {
   background-color: var(--zg-info-bg);
   color: var(--zg-info-text);
 }
+
+/* Action panel: full-screen sheet with full-width 44 px buttons below 768 px (ui-spec sec 6, 8) */
+@media (max-width: 767.98px) {
+  .zg-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 1040;
+    overflow-y: auto;
+    border-radius: 0;
+    margin: 0 !important;
+  }
+
+  .zg-sheet .btn {
+    width: 100%;
+    min-height: 44px;
+  }
+}

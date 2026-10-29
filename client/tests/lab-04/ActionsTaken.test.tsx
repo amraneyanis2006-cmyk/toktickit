@@ -134,6 +134,17 @@ describe('ActionsTaken (UI-03)', () => {
     await waitFor(() => expect(JSON.parse((apiFetch as any).mock.calls[0][1].body)).toMatchObject({ status: 'CANCELLED' }));
   });
 
+  it('UI-03: View on another row while a panel is open shows and saves that row (not the previous one)', async () => {
+    renderList([action({ id: 1, description: 'first' }), action({ id: 2, description: 'second', actionAt: '2026-10-28T04:00:00.000Z' })]);
+    const views = within(desktopTable()).getAllByRole('button', { name: /view/i });
+    await userEvent.click(views[0]!);
+    await userEvent.click(views[1]!);
+    expect(screen.getByLabelText(/action description/i)).toHaveValue('second');
+    await userEvent.type(screen.getByLabelText(/action description/i), '!');
+    await userEvent.click(screen.getByRole('button', { name: /save changes/i }));
+    await waitFor(() => expect((apiFetch as any).mock.calls[0][0]).toBe('/staff/tickets/TKT-2026-000001/actions/2'));
+  });
+
   it('UI-03: a locked action opens read-only with only Close', async () => {
     renderList([action({ status: 'COMPLETED', result: 'Done' })]);
     await userEvent.click(within(desktopTable()).getByRole('button', { name: /view/i }));
@@ -169,12 +180,18 @@ describe('ActionsTaken (UI-03)', () => {
     (apiFetch as any)
       .mockRejectedValueOnce(new ApiError(409, 'TICKET_NOT_ACTIVE', 'x'))
       .mockRejectedValueOnce(Object.assign(new ApiError(409, 'IDEMPOTENCY_KEY_REUSED', 'x'), { details: { current: saved } }));
-    renderList([]);
+    const onChanged = renderList([]);
     await userEvent.click(screen.getByRole('button', { name: /add action/i }));
     await userEvent.type(screen.getByLabelText(/action description/i), 'Anything');
     await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
     expect(await screen.findByText(/this ticket is no longer active, so its actions can't be changed\./i)).toHaveClass('zg-callout-error');
+    // The panel is frozen; closing it reloads the Ticket Detail.
+    expect(screen.queryByRole('button', { name: /^save$/i })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /close/i }));
+    expect(onChanged).toHaveBeenCalled();
 
+    await userEvent.click(screen.getByRole('button', { name: /add action/i }));
+    await userEvent.type(screen.getByLabelText(/action description/i), 'Anything');
     await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
     expect(await screen.findByText(/already saved/i)).toBeInTheDocument();
     expect(screen.getByText('The action saved earlier')).toBeInTheDocument();

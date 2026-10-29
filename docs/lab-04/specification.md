@@ -480,6 +480,9 @@ into `main`, `reviewer.md` and `ai-use.md` completed, submission PDF Answer Part
    open on a ticket where BR-10 forbids further action writes; action writes on an
    inactive ticket answer `TICKET_NOT_ACTIVE` before `ACTION_LOCKED`/`STALE_UPDATE`
    (AC-06 qualified accordingly).
+   (l) The Lab 4 UI omits `expectedUpdatedAt` only for the CANCELLED transition, whose Lab 3
+   request body is asserted by an unchanged Lab 3 test; the locked-row status re-check still
+   blocks a concurrent status change.
    (a)–(j) tighten BR-10, BR-12 and BR-17; (k) tightens BR-10 and BR-13. BR-17 gains one
    server-only exception (the BR-13 cascade updates actions without a token), and on inactive tickets clients now get
    BR-10 `TICKET_NOT_ACTIVE` instead of BR-08/BR-09 `ACTION_LOCKED`. BR-18 is answered
