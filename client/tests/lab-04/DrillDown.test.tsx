@@ -42,6 +42,7 @@ describe('Drill-down filters (UI-05)', () => {
     const status = screen.getByLabelText('Filter by status') as HTMLSelectElement;
     expect(status.value).toBe('RESOLVED,CLOSED');
     expect(status.selectedOptions[0]!.textContent).toBe('Resolved, Closed');
+    expect(screen.getByRole('checkbox', { name: 'Resolved in the last 7 days' })).toBeChecked();
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Clear Filters' })[0]!);
     await waitFor(() => expect(lastQuery('/tickets').get('status')).toBeNull());
@@ -63,6 +64,7 @@ describe('Drill-down filters (UI-05)', () => {
     expect((screen.getByLabelText('Filter by priority') as HTMLSelectElement).selectedOptions[0]!.textContent).toBe('Not set');
     expect((screen.getByLabelText('Filter by status') as HTMLSelectElement).selectedOptions[0]!.textContent)
       .toBe('New, Open, In progress, Waiting for requester, Reopened');
+    expect(screen.getByRole('checkbox', { name: 'Requester says resolved' })).toBeChecked();
 
     await userEvent.click(screen.getByRole('button', { name: 'Remove filter: Filtered from Dashboard' }));
     await waitFor(() => expect(lastQuery('/staff/tickets').get('ownership')).toBeNull());
@@ -78,6 +80,7 @@ describe('Drill-down filters (UI-05)', () => {
     const paths = () => (apiFetch as any).mock.calls.map((c: [string]) => c[0]);
     await waitFor(() => expect(paths()).toContain('/admin/users?role=IT_STAFF&isActive=true'));
     expect(screen.getByLabelText('Filter by role')).toHaveValue('IT_STAFF');
+    expect(screen.getByLabelText('Filter by account status')).toHaveValue('true');
     expect(chip()).toBeInTheDocument();
 
     await userEvent.click(screen.getAllByRole('button', { name: /^clear/i })[0]!);

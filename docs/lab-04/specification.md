@@ -446,7 +446,9 @@ into `main`, `reviewer.md` and `ai-use.md` completed, submission PDF Answer Part
      (was My Tickets / Ticket Queue / User Management). An earlier (Lab 2–3) E2E
      test may **either** update its post-login landing-URL assertion **or** add
      exactly one navigation step right after login (`page.goto` or a nav click) to
-     reach the screen it tests. No other change to earlier tests is allowed.
+     reach the screen it tests. Because the forbidden-route redirect also goes to the
+     role's dashboard (ui-spec §3), an earlier test asserting that redirect target may
+     update it to `/dashboard` as well. No other change to earlier tests is allowed.
    - **CHG-02** — the resolution gate means a Ticket cannot be resolved without
      recorded work. Lab 3 tests that resolve a Ticket now first create one COMPLETED
      Action Taken in their (shared) fixture; their assertions are unchanged. Because the

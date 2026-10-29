@@ -468,7 +468,7 @@ export default function UserManagement() {
       {fromDashboard && <DashboardChip onRemove={clearFilters} />}
 
       <div className="row g-2 mb-4">
-        <div className="col-12 col-md-6">
+        <div className="col-12 col-md-4">
           <input
             type="search"
             className="form-control"
@@ -478,7 +478,7 @@ export default function UserManagement() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="col-8 col-md-4">
+        <div className="col-6 col-md-3">
           <select
             className="form-select"
             aria-label="Filter by role"
@@ -493,7 +493,14 @@ export default function UserManagement() {
             ))}
           </select>
         </div>
-        <div className="col-4 col-md-2">
+        <div className="col-6 col-md-3">
+          <select className="form-select" aria-label="Filter by account status" value={activeFilter} onChange={(e) => setActiveFilter(e.target.value)}>
+            <option value="">All Accounts</option>
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </select>
+        </div>
+        <div className="col-12 col-md-2">
           {filtersActive && (
             <button type="button" className="btn btn-zg-tertiary w-100" onClick={clearFilters}>
               Clear

@@ -74,7 +74,7 @@ describe('StaffDashboard (UI-01)', () => {
     expect(screen.queryByRole('heading', { name: 'User Accounts' })).not.toBeInTheDocument();
   });
 
-  it('UI-01: the User Accounts card (Administrator) links to User Management filtered by role and status', async () => {
+  it('UI-01: the User Accounts card (sent by the API to Administrators only) links to User Management filtered by role and status', async () => {
     (apiFetch as any).mockResolvedValue(data({ userAccounts: { activeRequesters: 5, activeItStaff: 3, activeAdministrators: 1, inactive: 2 } }));
     renderPage();
     const card = (await screen.findByRole('heading', { name: 'User Accounts' })).closest('.zg-card') as HTMLElement;

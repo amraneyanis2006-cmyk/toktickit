@@ -24,7 +24,7 @@ test.describe('Checklist: Authenticated shell per role', () => {
       test(`${c.role} shell at ${bp.name}`, async ({ page }) => {
         await page.setViewportSize({ width: bp.width, height: bp.height });
         await login(page, c.email, FIXTURE_PASSWORD);
-        await page.waitForURL(`**${c.url}`);
+        await page.waitForURL('**/dashboard'); // CHG-01
         await page.screenshot({ path: `artifacts/lab-03/screenshots/shell/${c.role}-${bp.name}.png`, fullPage: true });
       });
     }

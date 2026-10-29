@@ -209,6 +209,11 @@ export default function StaffTicketQueue() {
             <option value="unassigned">Unassigned</option>
           </select>
         </div>
+        <div className="col-12 form-check ms-1">
+          <input id="requesterResolved" type="checkbox" className="form-check-input" checked={requesterResolved}
+            onChange={(e) => { setRequesterResolved(e.target.checked); setPage(1); }} />
+          <label htmlFor="requesterResolved" className="form-check-label small">Requester says resolved</label>
+        </div>
       </div>
 
       {fetchState === 'error' && (
