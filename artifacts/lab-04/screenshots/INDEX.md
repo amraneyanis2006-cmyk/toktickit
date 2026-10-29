@@ -132,3 +132,21 @@ Files ending in `-simulated` show a state produced with `page.route` (loading, e
 - `regression/06-user-management-desktop-1280.png` - User Management list (Administrator).
 - `regression/06-user-management-tablet-768.png` - User Management list (Administrator).
 - `regression/06-user-management-mobile-320.png` - User Management list (Administrator).
+
+## demo
+
+- `demo/01-admin-dashboard-desktop-1280.png` - Seeded Administrator (admin@example.com) dashboard with User Accounts.
+- `demo/01-admin-dashboard-tablet-768.png` - Seeded Administrator (admin@example.com) dashboard with User Accounts.
+- `demo/01-admin-dashboard-mobile-320.png` - Seeded Administrator (admin@example.com) dashboard with User Accounts.
+- `demo/02-staff-dashboard-desktop-1280.png` - Seeded IT Staff (alex.kim@example.com) dashboard.
+- `demo/02-staff-dashboard-tablet-768.png` - Seeded IT Staff (alex.kim@example.com) dashboard.
+- `demo/02-staff-dashboard-mobile-320.png` - Seeded IT Staff (alex.kim@example.com) dashboard.
+- `demo/03-requester-dashboard-desktop-1280.png` - Seeded Requester (jennifer.anderson@toktickit.test) dashboard.
+- `demo/03-requester-dashboard-tablet-768.png` - Seeded Requester (jennifer.anderson@toktickit.test) dashboard.
+- `demo/03-requester-dashboard-mobile-320.png` - Seeded Requester (jennifer.anderson@toktickit.test) dashboard.
+- `demo/04-staff-ticket-actions-desktop-1280.png` - Seeded ticket with several Actions Taken, as IT Staff (Alex, Ticket Owner).
+- `demo/04-staff-ticket-actions-tablet-768.png` - Seeded ticket with several Actions Taken, as IT Staff (Alex, Ticket Owner).
+- `demo/04-staff-ticket-actions-mobile-320.png` - Seeded ticket with several Actions Taken, as IT Staff (Alex, Ticket Owner).
+- `demo/05-requester-ticket-actions-desktop-1280.png` - The same seeded ticket as its Requester: read-only "Work done on your ticket".
+- `demo/05-requester-ticket-actions-tablet-768.png` - The same seeded ticket as its Requester: read-only "Work done on your ticket".
+- `demo/05-requester-ticket-actions-mobile-320.png` - The same seeded ticket as its Requester: read-only "Work done on your ticket".
