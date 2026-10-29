@@ -37,7 +37,8 @@ beforeAll(async () => {
   const unassigned = await createTicket(prisma, fx, { status: 'NEW', ownerId: null, itPriority: 'HIGH' });
   const mine = await createTicket(prisma, fx, { status: 'IN_PROGRESS', ownerId: s, itPriority: 'MEDIUM' });
   await createTicket(prisma, fx, { status: 'OPEN', ownerId: s, itPriority: null });
-  await createTicket(prisma, fx, { status: 'RESOLVED', ownerId: s, itPriority: 'HIGH', resolvedAt: new Date() });
+  // An old inactive HIGH ticket that must never appear in urgentTickets (active only).
+  await createTicket(prisma, fx, { status: 'RESOLVED', ownerId: s, itPriority: 'HIGH', resolvedAt: new Date(), createdAt: new Date('2000-01-01T00:00:00.000Z') });
   const review = await createTicket(prisma, fx, { status: 'WAITING_FOR_REQUESTER', ownerId: fx.staffB.id, itPriority: 'LOW' });
   const reviewDone = await createTicket(prisma, fx, { status: 'CLOSED', ownerId: s, resolvedAt: new Date() });
   await prisma.ticket.updateMany({ where: { id: { in: [review.id, reviewDone.id] } }, data: { requesterIndicatedResolved: true } });
@@ -157,6 +158,7 @@ describe('GET /api/dashboard/staff', () => {
     for (const t of urgentTickets) {
       expect(Object.keys(t).sort()).toEqual(['createdAt', 'currentStatus', 'itPriority', 'summary', 'ticketNumber', 'ticketOwner'].sort());
       expect(t.itPriority).toBe('HIGH');
+      expect(ACTIVE_LIST.split(',')).toContain(t.currentStatus);
     }
     const created = urgentTickets.map((t: { createdAt: string }) => t.createdAt);
     expect(created).toEqual([...created].sort());

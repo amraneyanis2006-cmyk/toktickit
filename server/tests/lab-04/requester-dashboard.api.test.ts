@@ -53,8 +53,12 @@ describe('GET /api/dashboard/requester', () => {
     expect(b.status).toBe(200);
     expect(a.body.metrics.openTickets.value).toBe(4);
     expect(b.body.metrics.openTickets.value).toBe(1);
-    const ownA = (await prisma.ticket.findMany({ where: { requesterId: fx.requesterA.id }, select: { ticketNumber: true } })).map((t) => t.ticketNumber);
-    for (const t of [...a.body.recentTickets, ...a.body.attentionTickets]) expect(ownA).toContain(t.ticketNumber);
+    for (const [res, id] of [[a, fx.requesterA.id], [b, fx.requesterB.id]] as const) {
+      const own = (await prisma.ticket.findMany({ where: { requesterId: id }, select: { ticketNumber: true } })).map((t) => t.ticketNumber);
+      for (const t of [...res.body.recentTickets, ...res.body.attentionTickets]) expect(own).toContain(t.ticketNumber);
+    }
+    expect(b.body.metrics).toMatchObject({ closedTickets: { value: 1 }, resolvedLast7Days: { value: 0 }, waitingForMe: { value: 0 } });
+    expect(b.body.recentTickets).toHaveLength(2);
 
     const spoofed = await dashboard(cookieA, `?requesterId=${fx.requesterB.id}`);
     expect(spoofed.body.metrics).toEqual(a.body.metrics);

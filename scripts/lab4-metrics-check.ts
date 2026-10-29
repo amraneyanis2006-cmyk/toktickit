@@ -31,6 +31,7 @@ async function count(sql: string, ...params: unknown[]) {
 
 async function main() {
   const rows: Array<[string, number, number]> = [];
+  const notes: string[] = [];
   const add = async (metric: string, api: number, sql: string, ...params: unknown[]) => rows.push([metric, api, await count(sql, ...params)]);
 
   const requester = await login("sara.lee@example.com");
@@ -64,7 +65,7 @@ async function main() {
       await add(`${who}.userAccounts.activeAdministrators`, s.userAccounts.activeAdministrators, ...role("ADMINISTRATOR"));
       await add(`${who}.userAccounts.inactive`, s.userAccounts.inactive, `FROM "User" WHERE NOT "isActive"`);
     } else {
-      console.log(`${who}: no userAccounts in the response (IT Staff, BR-27)`);
+      notes.push(`${who}: no userAccounts in the response (IT Staff, BR-27)`);
     }
   }
 
@@ -72,6 +73,7 @@ async function main() {
   console.log("metric | API | SQL | match");
   for (const [metric, api, sql] of rows) console.log(`${metric} | ${api} | ${sql} | ${api === sql ? "yes" : "NO"}`);
   const bad = rows.filter(([, api, sql]) => api !== sql).length;
+  for (const note of notes) console.log(note);
   console.log(`${rows.length} metrics, ${bad} mismatch(es)`);
   process.exitCode = bad ? 1 : 0;
 }

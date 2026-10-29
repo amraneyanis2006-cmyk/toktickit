@@ -24,6 +24,10 @@ async function p95(n: number, call: () => PromiseLike<{ status: number }>) {
 
 beforeAll(async () => {
   fx = await createFixture(prisma, PREFIX);
+  // A Requester with real data, so PERF-01 does not time empty counts.
+  for (const status of ['NEW', 'IN_PROGRESS', 'WAITING_FOR_REQUESTER', 'RESOLVED', 'CLOSED'] as const) {
+    await createTicket(prisma, fx, { requesterId: fx.requesterA.id, status, resolvedAt: status === 'RESOLVED' || status === 'CLOSED' ? new Date() : null });
+  }
 });
 
 afterAll(async () => {

@@ -1,5 +1,4 @@
-alex.kim: no userAccounts in the response (IT Staff, BR-27)
-Lab 4 metrics check - 2026-10-29T03:44:41.142Z
+Lab 4 metrics check - 2026-10-29T03:49:28.108Z
 metric | API | SQL | match
 requester.openTickets | 1 | 1 | yes
 requester.waitingForMe | 1 | 1 | yes
@@ -43,4 +42,5 @@ admin.userAccounts.activeRequesters | 14 | 14 | yes
 admin.userAccounts.activeItStaff | 5 | 5 | yes
 admin.userAccounts.activeAdministrators | 2 | 2 | yes
 admin.userAccounts.inactive | 12 | 12 | yes
+alex.kim: no userAccounts in the response (IT Staff, BR-27)
 42 metrics, 0 mismatch(es)
