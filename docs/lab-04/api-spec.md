@@ -50,6 +50,7 @@ endpoint uses)
 { "canResolve": false, "blockers": ["OPEN_ACTIONS"] }
 ```
 `blockers` ⊆ `["UNASSIGNED", "NO_COMPLETED_ACTION", "OPEN_ACTIONS"]`.
+It is meaningful only when `RESOLVED` is in `legalNextStatuses`; the UI combines both.
 
 **Active statuses** (used by filters and metrics):
 `NEW, OPEN, IN_PROGRESS, WAITING_FOR_REQUESTER, REOPENED`.
@@ -97,8 +98,16 @@ an empty key (Lab 3 AC-09). Another Requester's Ticket → `404 NOT_FOUND`.
 `ticketId` are **never** read from the body (BR-01, BR-04). `status` is always
 `PLANNED` on creation.
 - **201** → `ActionTaken`.
-- **200** → the existing `ActionTaken`, unchanged, when the same `clientRequestId` was
-  already used on this Ticket **with the same payload** (idempotent replay, BR-18).
+- **200** → the existing `ActionTaken` in its current state, unchanged by the replay, when
+  the same `clientRequestId` was already used on this Ticket **with the same payload**
+  (idempotent replay, BR-18). The
+  replay is answered before the `TICKET_NOT_ACTIVE` check and returns the action in its
+  current state (e.g. CANCELLED after a ticket-cancel cascade). Check order: ticket (404) →
+  validation (400, needs the ticket's creation time) → replay (200) /
+  `IDEMPOTENCY_KEY_REUSED` → `TICKET_NOT_ACTIVE` → `INVALID_ASSIGNEE` → create. Inside the
+  write transaction the active status is re-checked on the share-locked row; if the
+  ticket became inactive, the key is looked up again first, so a retry whose original
+  committed meanwhile still gets the replay (BR-18 before BR-10).
 - **409 `IDEMPOTENCY_KEY_REUSED`** the same `clientRequestId` was already used on this
   Ticket with a **different** payload (any of `actionAt`, `description`, `result`,
   `followUpRequired`, `followUpNote`, `attachmentNotes`, `performedById`, compared after
@@ -110,13 +119,17 @@ an empty key (Lab 3 AC-09). Another Requester's Ticket → `404 NOT_FOUND`.
   `followUpRequired` is true; > 1000), `attachmentNotes` (> 500),
   `clientRequestId` (not a UUID).
 - **404 `NOT_FOUND`** unknown ticket.
-- **409 `TICKET_NOT_ACTIVE`** ticket is RESOLVED, CLOSED, or CANCELLED (BR-10).
+- **409 `TICKET_NOT_ACTIVE`** ticket is RESOLVED, CLOSED, or CANCELLED (BR-10); re-checked on the
+  share-locked ticket row inside the write transaction (§8), so it can also follow a
+  concurrent status change.
 - **422 `INVALID_ASSIGNEE`** `performedById` is not an active IT Staff/Administrator.
 
 ## 5. PATCH /api/staff/tickets/:ticketNumber/actions/:actionId 🔒S
 
 Edit and/or assign an **open** Action Taken. Partial update: only supplied fields
-change.
+change. Check order: ticket/action (404) → validation (400) → `TICKET_NOT_ACTIVE` (BR-10, also for actions a
+ticket cancel has cancelled) → `ACTION_LOCKED` → `STALE_UPDATE` → `INVALID_ASSIGNEE`;
+the ticket row is share-locked before the action row is written (§8).
 - **Request**
 ```json
 {
@@ -135,11 +148,16 @@ change.
 - **404 `NOT_FOUND`** unknown ticket, or action not belonging to that ticket.
 - **409 `STALE_UPDATE`** `expectedUpdatedAt` ≠ stored `updatedAt`; body includes
   `"current": ActionTaken` so the client can refresh (BR-17).
-- **409 `ACTION_LOCKED`** action is COMPLETED or CANCELLED (BR-09).
-- **409 `TICKET_NOT_ACTIVE`** (BR-10).
+- **409 `ACTION_LOCKED`** action is COMPLETED or CANCELLED (BR-09) - active ticket only;
+  on an inactive ticket `TICKET_NOT_ACTIVE` is answered instead.
+- **409 `TICKET_NOT_ACTIVE`** (BR-10; re-checked on the share-locked ticket row, §8).
 - **422 `INVALID_ASSIGNEE`** (BR-05).
 
 ## 6. PATCH /api/staff/tickets/:ticketNumber/actions/:actionId/status 🔒S
+
+Check order: ticket/action (404) → validation (400) → `TICKET_NOT_ACTIVE` → `ACTION_LOCKED` → `STALE_UPDATE` →
+`INVALID_ACTION_TRANSITION` → Result required for COMPLETED (the `400 fields.result` comes
+last because it depends on the stored Result).
 
 - **Request** `{ "status": "COMPLETED", "result": "Fixed after reboot.", "expectedUpdatedAt": "…" }`
   (`result` optional if already stored; required for COMPLETED when the stored result
@@ -148,10 +166,12 @@ change.
 - **400 `VALIDATION_ERROR`** invalid `status` value; `fields.result` when completing
   without a Result; `expectedUpdatedAt` missing.
 - **409 `ACTION_LOCKED`** the action is COMPLETED or CANCELLED (checked before the
-  transition rule, BR-09).
+  transition rule, BR-09) - active ticket only; on an inactive ticket
+  `TICKET_NOT_ACTIVE` is answered instead.
 - **409 `INVALID_ACTION_TRANSITION`** a move between open states not allowed by BR-08
   (e.g. IN_PROGRESS → PLANNED, PLANNED → PLANNED).
-- **409 `STALE_UPDATE`** (with `current`), **409 `TICKET_NOT_ACTIVE`**, **404**.
+- **409 `STALE_UPDATE`** (with `current`), **409 `TICKET_NOT_ACTIVE`** (re-checked on the
+  share-locked ticket row, §8), **404**.
 
 ## 7. List endpoints — drill-down filters (changed — additive, backward compatible)
 
@@ -188,14 +208,29 @@ The UI initialises its `role` and `isActive` filters from the URL
 ## 8. PATCH /api/staff/tickets/:ticketNumber/status 🔒S (changed)
 
 - **Request** `{ "currentStatus": "RESOLVED", "expectedUpdatedAt": "2026-10-28T03:40:12.000Z" }`
-  (`expectedUpdatedAt` optional for Lab 3 compatibility; always sent by the Lab 4 UI).
+  (`expectedUpdatedAt` optional for Lab 3 compatibility - omitted or `null` means not
+  sent; always sent by the Lab 4 UI).
 - **Processing order:** validate value → load ticket (404) → stale check (409
   `STALE_UPDATE`) → matrix (409 `INVALID_TRANSITION`) → owner check for
-  RESOLVED/CLOSED (409 `UNASSIGNED_TICKET`) → resolution gate for RESOLVED (409
-  `RESOLUTION_BLOCKED`) → **one transaction**: conditional update
-  `WHERE id = :id AND currentStatus = :readStatus` (0 rows → 409 `STALE_UPDATE`),
-  set/clear `resolvedAt`, clear `requesterIndicatedResolved` on REOPENED, insert
-  `TicketStatusChange`.
+  RESOLVED/CLOSED (409 `UNASSIGNED_TICKET`) → **one transaction**: lock the ticket
+  row (`SELECT … FOR NO KEY UPDATE`) and re-read it → on the locked row: status and token
+  unchanged (else 409 `STALE_UPDATE`) → owner for RESOLVED/CLOSED (else 409
+  `UNASSIGNED_TICKET`) → resolution gate for RESOLVED (409 `RESOLUTION_BLOCKED`) →
+  conditional update
+  `WHERE id = :id AND currentStatus = :readStatus` (plus `AND updatedAt =
+  :expectedUpdatedAt` when the token is sent; 0 rows → 409 `STALE_UPDATE`; defence in
+  depth behind the locked-row re-check), set/clear `resolvedAt`, clear
+  `requesterIndicatedResolved` on REOPENED, on CANCELLED set every PLANNED/IN_PROGRESS
+  Action Taken of the ticket to CANCELLED (`cancelledAt` = `updatedAt` = the change time,
+  BR-13/BR-17),
+  insert `TicketStatusChange`. Every Action Taken write
+  (`POST …/actions`, `PATCH …/actions/:actionId`, `PATCH …/actions/:actionId/status`)
+  takes a share lock on the same ticket row (design rule: every transaction that
+  writes Action Taken rows locks the ticket row first, which keeps the cancel cascade
+  free of lock-order deadlocks)
+  and re-reads its status in its own transaction, so a concurrent status change and
+  action write are serialized: either the gate sees the new open action or the write
+  gets `409 TICKET_NOT_ACTIVE`.
 - **200**
 ```json
 {
@@ -214,6 +249,18 @@ The UI initialises its `role` and `isActive` filters from the URL
   "message": "This ticket cannot be resolved yet: complete or cancel the open actions.",
   "blockers": ["OPEN_ACTIONS"] }
 ```
+  (`blockers` ⊆ `["NO_COMPLETED_ACTION", "OPEN_ACTIONS"]`; an unowned ticket fails
+  earlier with `UNASSIGNED_TICKET`.)
+- **409 `STALE_UPDATE`** (stale `expectedUpdatedAt`, or another request changed the
+  status between the read and the conditional update): body includes `"current"`,
+  the ticket's latest summary in the 200 shape without `statusChange`
+  (`ticketNumber`, `currentStatus`, `requesterIndicatedResolved`, `resolvedAt`,
+  `updatedAt`, `legalNextStatuses`).
+- **400 `VALIDATION_ERROR`** with `fields.currentStatus` (missing/unknown value) and/or
+  `fields.expectedUpdatedAt` (all invalid fields at once) (sent but not an ISO-8601 date-time with a time zone).
+- **500 `INTERNAL_ERROR`** a lock wait longer than the 15 s transaction timeout
+  (known limitation; a steady stream of share-locking action writes can delay a
+  status change this long, since Postgres may grant new share locks ahead of it).
 
 ## 9. GET /api/dashboard/requester 🔒R
 
@@ -289,7 +336,7 @@ each with drill-down `/staff/tickets?status=<S>` or
 | Status | Codes |
 |---|---|
 | 200 | idempotent replay of an Action Taken create |
-| 400 | `VALIDATION_ERROR` (Action Taken fields, unknown status in list filter, missing `expectedUpdatedAt`) |
+| 400 | `VALIDATION_ERROR` (Action Taken fields, unknown status in list filter, missing `expectedUpdatedAt` on Action Taken updates, invalid `currentStatus` or `expectedUpdatedAt` on the ticket status change) |
 | 409 | `RESOLUTION_BLOCKED`, `STALE_UPDATE`, `INVALID_ACTION_TRANSITION`, `ACTION_LOCKED`, `TICKET_NOT_ACTIVE`, `IDEMPOTENCY_KEY_REUSED` (+ Lab 3 codes) |
 | 422 | `INVALID_ASSIGNEE` (+ Lab 3 `INVALID_OWNER`) |
 | 503 | `GET /api/health/db` with database unreachable |

@@ -6,6 +6,7 @@ import path from 'node:path';
 import { PrismaClient } from '@prisma/client';
 import app from '../../src/app';
 import { backfillResolvedAt, RESOLVED_AT_BACKFILL_SQL } from '../../src/utils/resolvedAtBackfill';
+import { OPEN_ACTION_STATUSES } from '../../src/utils/actionTransition';
 import { createFixture, cleanupPrefix, createTicket, loginAs } from './fixtures';
 import type { Lab4Fixture } from './fixtures';
 import {
@@ -166,6 +167,16 @@ describe('Lab 4 migration', () => {
       select: { ticketNumber: true },
     });
     expect(lab4.length).toBeGreaterThanOrEqual(6);
+    // BR-10/BR-13 invariant: no seed ticket in an inactive status has an open action.
+    const openOnInactive = await prisma.actionTaken.count({
+      where: { status: { in: [...OPEN_ACTION_STATUSES] }, ticket: { ...seedTickets, currentStatus: { in: ['RESOLVED', 'CLOSED', 'CANCELLED'] } } },
+    });
+    expect(openOnInactive).toBe(0);
+    // Not trivially true: some inactive seed tickets do carry (finished) actions.
+    const actionsOnInactive = await prisma.actionTaken.count({
+      where: { ticket: { ...seedTickets, currentStatus: { in: ['RESOLVED', 'CLOSED', 'CANCELLED'] } } },
+    });
+    expect(actionsOnInactive).toBeGreaterThan(0);
     for (const t of lab4) expect(t.ticketNumber).toMatch(/^TKT-\d{4}-\d{6}$/);
   }, 180_000);
 });

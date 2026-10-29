@@ -121,8 +121,8 @@ final demonstration.
 | BR-05 | **Performed by** ("auto") defaults to the creator. It may be re-assigned only to an **active** user whose role is IT Staff or Administrator; any other value is rejected with `422 INVALID_ASSIGNEE` and nothing is saved. |
 | BR-06 | **Action Date/Time** is required (the form pre-fills "now"); it must not be earlier than the Ticket's creation time (compared at minute precision, the resolution of the form's `datetime-local` value) nor later than the server time + 5 minutes; it is sent as ISO-8601 with a time zone. Stored in UTC, displayed in the viewer's local time zone. |
 | BR-07 | Field rules (trimmed): Action Description required, 1–2000 characters. Result optional while the action is open, **required (1–2000) to complete it**. Follow-up Note **required (1–1000) when Follow-Up Required is true**, and stored as `null` when it is false. Attachment Notes optional, ≤ 500 characters, plain text describing which file to look at (e.g. an attachment file name); it is not an upload. |
-| BR-08 | Action Taken status transitions: PLANNED → IN_PROGRESS, COMPLETED, CANCELLED; IN_PROGRESS → COMPLETED, CANCELLED; COMPLETED and CANCELLED are terminal: any status change on them → `409 ACTION_LOCKED` (checked first, BR-09). Any other move not listed (between open states, e.g. IN_PROGRESS → PLANNED, PLANNED → PLANNED) → `409 INVALID_ACTION_TRANSITION`. Completing sets `completedAt`; cancelling sets `cancelledAt`. |
-| BR-09 | **Append-only:** Actions Taken are never deleted (no DELETE endpoint). A COMPLETED or CANCELLED Action Taken is immutable (`409 ACTION_LOCKED`); a correction is recorded as a new Action Taken. Public Comments, Internal Notes, and Status History entries are also append-only. |
+| BR-08 | Action Taken status transitions: PLANNED → IN_PROGRESS, COMPLETED, CANCELLED; IN_PROGRESS → COMPLETED, CANCELLED; COMPLETED and CANCELLED are terminal: any status change on them → `409 ACTION_LOCKED` (BR-09; checked first among the action rules, after BR-10 `TICKET_NOT_ACTIVE`). Any other move not listed (between open states, e.g. IN_PROGRESS → PLANNED, PLANNED → PLANNED) → `409 INVALID_ACTION_TRANSITION`. Completing sets `completedAt`; cancelling sets `cancelledAt`. The only other way an action becomes CANCELLED is the ticket-cancel cascade of BR-13. |
+| BR-09 | **Append-only:** Actions Taken are never deleted (no DELETE endpoint). A COMPLETED or CANCELLED Action Taken is immutable (`409 ACTION_LOCKED` on an active Ticket; on an inactive Ticket BR-10 `TICKET_NOT_ACTIVE` is answered first); a correction is recorded as a new Action Taken. Public Comments, Internal Notes, and Status History entries are also append-only. |
 | BR-10 | Actions Taken can be created or edited only while the Ticket is active (NEW, OPEN, IN_PROGRESS, WAITING_FOR_REQUESTER, REOPENED); otherwise `409 TICKET_NOT_ACTIVE`. To work on a Resolved or Closed Ticket, IT Staff reopen it first. |
 
 ### 5.1 Ticket Status and Resolution
@@ -147,12 +147,12 @@ change the status (they can only set the advisory indication, BR-14).
 |----|------|
 | BR-11 | Only the transitions in the matrix above are allowed (`409 INVALID_TRANSITION` otherwise), only for IT Staff and Administrators, enforced by the backend. |
 | BR-12 | **Resolution gate.** A Ticket may enter RESOLVED only if (a) it has a Ticket Owner, (b) it has at least one COMPLETED Action Taken, and (c) it has no PLANNED or IN_PROGRESS Action Taken. (a) fails with the Lab 3 code `409 UNASSIGNED_TICKET`; (b)/(c) fail with `409 RESOLUTION_BLOCKED` and `blockers: ["NO_COMPLETED_ACTION", "OPEN_ACTIONS"]` (those that apply). The check runs inside the status endpoint, so a client that bypasses the screen gets the same result. |
-| BR-13 | CLOSED is reachable only from RESOLVED, so every closed Ticket has passed the gate. CANCELLED does not require any Action Taken and needs a UI confirmation step. |
+| BR-13 | CLOSED is reachable only from RESOLVED, so every closed Ticket has passed the gate. CANCELLED does not require any Action Taken and needs a UI confirmation step. Cancelling a Ticket also cancels its open (PLANNED / IN_PROGRESS) Actions Taken in the same transaction (`status = CANCELLED`, `cancelledAt` = the change time); completed and already-cancelled actions are untouched. The ticket's `TicketStatusChange` row (→ CANCELLED, by, at = the actions' `cancelledAt`) is the audit record of that cascade. |
 | BR-14 | A Requester's "Problem Appears Resolved" indication is advisory: it sets `requesterIndicatedResolved = true`, never changes `currentStatus`, appears to IT Staff as "Awaiting review", and is cleared when the Ticket is REOPENED. |
 | BR-15 | Entering RESOLVED sets `resolvedAt = now()`; entering REOPENED clears `resolvedAt`; CLOSED keeps it. |
 | BR-16 | Every successful status change writes exactly one `TicketStatusChange` row (from, to, changed by, changed at) in the **same database transaction** as the status update. These rows are never updated or deleted. |
-| BR-17 | **Stale updates.** Every Action Taken update must send `expectedUpdatedAt`; if the stored `updatedAt` differs, the update is rejected with `409 STALE_UPDATE` and the current record. The Ticket status endpoint accepts `expectedUpdatedAt` (always sent by the Lab 4 UI; optional in the API for Lab 3 compatibility) with the same behavior, and performs a conditional update on the status it read, so two simultaneous transitions can never both succeed. |
-| BR-18 | **Idempotent creation.** Creating an Action Taken accepts a client-generated `clientRequestId` (UUID). A repeated request with the same Ticket, `clientRequestId` **and payload** returns the original Action Taken unchanged (`200`) instead of creating a duplicate. The same key with a different payload (any of `actionAt`, `description`, `result`, `followUpRequired`, `followUpNote`, `attachmentNotes`, `performedById`, compared after validation/trimming) → `409 IDEMPOTENCY_KEY_REUSED` with `current` (the original) and nothing is saved. |
+| BR-17 | **Stale updates.** Every Action Taken update must send `expectedUpdatedAt`; if the stored `updatedAt` differs, the update is rejected with `409 STALE_UPDATE` and the current record (on an inactive Ticket BR-10 `TICKET_NOT_ACTIVE` is answered first). The Ticket status endpoint accepts `expectedUpdatedAt` (always sent by the Lab 4 UI; optional in the API for Lab 3 compatibility) with the same behavior, and performs a conditional update on the status it read, so two simultaneous transitions can never both succeed. The server-side ticket-cancel cascade of BR-13 is the only Action Taken update without a token; it changes `updatedAt`, and later client writes on that ticket get `TICKET_NOT_ACTIVE`. |
+| BR-18 | **Idempotent creation.** Creating an Action Taken accepts a client-generated `clientRequestId` (UUID). A repeated request with the same Ticket, `clientRequestId` **and payload** returns the original Action Taken in its current state (`200`, unchanged by the replay) instead of creating a duplicate; the replay and `IDEMPOTENCY_KEY_REUSED` are answered before `TICKET_NOT_ACTIVE`. The same key with a different payload (any of `actionAt`, `description`, `result`, `followUpRequired`, `followUpNote`, `attachmentNotes`, `performedById`, compared after validation/trimming) → `409 IDEMPOTENCY_KEY_REUSED` with `current` (the original) and nothing is saved. |
 | BR-19 | **Stable ordering.** Actions Taken: `actionAt` ascending, then `id` ascending. Status History: `changedAt` ascending, then `id`. Public Comments and Internal Notes: `createdAt` ascending, then `id`. The same data always renders in the same order. |
 | BR-20 | **Visibility.** IT Staff and Administrators see everything on every Ticket. A Requester sees, on their own Tickets only: ticket fields, Attachments, Public Comments, Actions Taken, and Status History — never Internal Notes (Lab 3 BR-08/BR-27 unchanged). |
 
@@ -340,6 +340,12 @@ seed tickets.
 - Non-zero and zero metrics: one seeded Requester has no Ticket at all, and one IT
   Staff member has no open Action (both dashboards render their empty states).
 - Status History rows for the seeded workflow transitions.
+- No RESOLVED, CLOSED, or CANCELLED seed ticket has a PLANNED or IN_PROGRESS Action Taken
+  (BR-10/BR-13; checked by MIG-04). Existing data needs no repair: Actions Taken exist
+  only since this sprint and no open action sits on an inactive ticket (checked on the
+  dev database when BR-13 was amended with: `SELECT count(*) FROM "ActionTaken" a JOIN
+  "Ticket" t ON t.id = a."ticketId" WHERE a.status IN ('PLANNED','IN_PROGRESS') AND
+  t."currentStatus" IN ('RESOLVED','CLOSED','CANCELLED')` → 0).
 - Credentials stay local-development-only (README).
 
 ## 8. API Contract
@@ -376,12 +382,12 @@ There is **no** DELETE endpoint for Actions Taken, Status History, Comments, or 
 | AC-03 | Given an Action Taken being created or assigned to an inactive user or to a Requester, when it is submitted, then it is rejected with `422 INVALID_ASSIGNEE` and nothing is saved. |
 | AC-04 | Given Follow-Up Required is checked and the Follow-up Note is empty, when the action is saved, then it is rejected with a field-level validation error and nothing is saved. |
 | AC-05 | Given a Requester session, when any Action Taken create/update/status endpoint is called directly, then it is rejected with `403`; the Requester sees the Actions Taken of their own Ticket read-only and gets `404` for another Requester's Ticket. |
-| AC-06 | Given an open Action Taken, when it is completed without a Result, then it is rejected; with a Result it becomes COMPLETED with `completedAt`, and any later edit is rejected with `409 ACTION_LOCKED`. |
+| AC-06 | Given an open Action Taken, when it is completed without a Result, then it is rejected; with a Result it becomes COMPLETED with `completedAt`, and any later edit while the Ticket is active is rejected with `409 ACTION_LOCKED` (`409 TICKET_NOT_ACTIVE` once the Ticket is inactive, BR-10). |
 | AC-07 | Given an open Action Taken, when it is cancelled after confirmation, then it becomes CANCELLED, stays visible in the list, and cannot be edited. |
 | AC-08 | Given a Ticket with no COMPLETED Action Taken or with an open Action Taken, when a transition to RESOLVED is requested (including directly through the API), then it is rejected with `409 RESOLUTION_BLOCKED` listing the blockers and the status is unchanged. |
 | AC-09 | Given an owned Ticket with at least one COMPLETED and no open Action Taken, when IT Staff resolve it, then the status becomes RESOLVED, `resolvedAt` is set, one Status History entry is appended, and the Ticket summary refreshes. |
 | AC-10 | Given any status pair not in the final matrix, when the transition is requested, then it is rejected with `409 INVALID_TRANSITION` and the status is unchanged. |
-| AC-11 | Given two IT Staff users editing the same Action Taken, when the second saves with a stale `expectedUpdatedAt`, then it is rejected with `409 STALE_UPDATE` and the first user's change is kept. |
+| AC-11 | Given two IT Staff users editing the same Action Taken, when the second saves with a stale `expectedUpdatedAt` while the Ticket is active, then it is rejected with `409 STALE_UPDATE` and the first user's change is kept. |
 | AC-12 | Given a Ticket whose status was changed by another user, when a stale status change is submitted, then it is rejected with `409 STALE_UPDATE` and nothing is overwritten. |
 | AC-13 | Given the same create request is sent twice with the same `clientRequestId`, when both are processed, then exactly one Action Taken exists. |
 | AC-14 | Given a Requester marks "Problem Appears Resolved", when IT Staff open the Ticket and their dashboard, then the status is unchanged, the Ticket shows "Awaiting review", and it is counted in `awaitingReview`. |
@@ -443,7 +449,38 @@ into `main`, `reviewer.md` and `ai-use.md` completed, submission PDF Answer Part
      reach the screen it tests. No other change to earlier tests is allowed.
    - **CHG-02** — the resolution gate means a Ticket cannot be resolved without
      recorded work. Lab 3 tests that resolve a Ticket now first create one COMPLETED
-     Action Taken in their fixture; their assertions are unchanged.
+     Action Taken in their (shared) fixture; their assertions are unchanged. Because the
+     status endpoint now writes `TicketStatusChange` rows (FK to the Ticket), those
+     tests' teardown also deletes the fixture actions and history rows before their
+     tickets; this teardown is part of the CHG-02 fixture change.
 8. **Administrator dashboard** reuses the IT Staff dashboard plus account counts,
    as allowed by the handout, instead of a third design.
 9. **Known Lab 3 schema drift, intentionally left untouched.** The Lab 3 hand-written migration left three `User` column defaults (`role`, `mustChangePassword`, `updatedAt`) and the `TicketComment`/`TicketInternalNote` foreign-key rules different from `schema.prisma`; fixing it would require a non-additive migration (`DROP DEFAULT`/`DROP CONSTRAINT`), so the Lab 4 migration is generated as a Lab 3 → Lab 4 schema diff and applied with `prisma migrate deploy`.
+10. **Contract amendments made with Issue #62 (stated in its PR):** api-spec §8 now
+   (a) evaluates the resolution gate inside the status transaction after locking the
+   ticket row (`FOR NO KEY UPDATE`), while Action Taken writes take a share lock on the same
+   row and re-read the ticket status, so a resolve, cancel or close and a concurrent
+   action write are serialized; (b) adds `AND updatedAt = :expectedUpdatedAt` to the
+   conditional update when the token is sent (defence in depth, not reachable once the
+   locked-row re-check of (f) has passed, so not separately tested); (c) defines the `current` body of the
+   ticket `STALE_UPDATE`; (d) states that `RESOLUTION_BLOCKED` blockers never contain
+   `UNASSIGNED` (that case is `UNASSIGNED_TICKET`); (e) treats `expectedUpdatedAt:
+   null` as not sent; (f) inside that transaction checks, on the locked row, status and
+   token (`STALE_UPDATE`), then owner (`UNASSIGNED_TICKET`), then the gate; (g) answers
+   an invalid body with `400 VALIDATION_ERROR` and `fields.currentStatus` /
+   `fields.expectedUpdatedAt` (a token must be an ISO-8601 date-time with a time zone)
+   before looking the ticket up; (h) the Action Taken endpoints (api-spec §4-§6) re-check
+   `TICKET_NOT_ACTIVE` on the share-locked ticket row inside their write transaction;
+   (i) api-spec §0 states that `resolutionGate` is meaningful only when `RESOLVED` is in
+   `legalNextStatuses`; (j) CHG-02 (§11.7) also covers the teardown of fixture actions
+   and history rows, and the CHG-02 action sits in the shared fixture of the Lab 3 file
+   whose tests resolve a Ticket (tests.md REG-01, WF-02/05/06/09 rows updated to match).
+   (k) owner decision on PR #70 (Issue #62): cancelling a Ticket also cancels its open Actions Taken
+   in the status transaction (BR-13, cross-referenced from BR-08), so no action stays
+   open on a ticket where BR-10 forbids further action writes; action writes on an
+   inactive ticket answer `TICKET_NOT_ACTIVE` before `ACTION_LOCKED`/`STALE_UPDATE`
+   (AC-06 qualified accordingly).
+   (a)–(j) tighten BR-10, BR-12 and BR-17; (k) tightens BR-10 and BR-13. BR-17 gains one
+   server-only exception (the BR-13 cascade updates actions without a token), and on inactive tickets clients now get
+   BR-10 `TICKET_NOT_ACTIVE` instead of BR-08/BR-09 `ACTION_LOCKED`. BR-18 is answered
+   before BR-10, also for a retry that waited behind a cancel.

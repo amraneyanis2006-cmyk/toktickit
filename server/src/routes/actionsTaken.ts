@@ -9,6 +9,7 @@ import type { ActionStatus } from '../utils/actionTransition';
 import { ACTION_LIMITS, parseIsoDateTime, validateActionFields } from '../utils/actionValidation';
 import type { ActionFieldErrors } from '../utils/actionValidation';
 import { ACTION_TAKEN_INCLUDE, ACTION_TAKEN_ORDER, toActionTaken } from '../utils/ticketHistory';
+import { LOCKING_TX_OPTIONS } from '../utils/transactions';
 
 // Actions Taken (docs/lab-04/api-spec.md sec 3-6, specification.md BR-01..BR-10,
 // BR-17..BR-19). IT Staff and Administrators only; there is deliberately no
@@ -91,17 +92,31 @@ async function staleUpdate(res: Response, actionId: number) {
 }
 
 /**
- * Conditional update on the updatedAt the client last saw (BR-17): if another
- * request changed the row in between, 0 rows match and nothing is written.
+ * Conditional update on the updatedAt the client last saw (BR-17), inside a
+ * transaction that share-locks the ticket and re-reads its status (BR-10):
+ * 'inactive' if the ticket is no longer active, 'stale' if another request
+ * changed the action in between (0 rows match), otherwise 'updated'.
  */
-async function updateIfUnchanged(actionId: number, expected: Date, data: Prisma.ActionTakenUncheckedUpdateManyInput) {
-  const { count } = await prisma.actionTaken.updateMany({
-    where: { id: actionId, updatedAt: expected },
-    // Strictly later than the token, even within the same millisecond, so an
-    // old token can never match the new version.
-    data: { ...data, updatedAt: new Date(Math.max(Date.now(), expected.getTime() + 1)) },
-  });
-  return count === 1;
+async function updateIfUnchanged(
+  ticketId: number,
+  actionId: number,
+  expected: Date,
+  data: Prisma.ActionTakenUncheckedUpdateManyInput
+): Promise<'updated' | 'stale' | 'inactive'> {
+  return prisma.$transaction(async (tx) => {
+    // Share-lock the ticket and re-read its status, so an edit cannot land on a
+    // ticket that a concurrent request has just made inactive (BR-10).
+    await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticketId} FOR SHARE`;
+    const ticket = await tx.ticket.findUniqueOrThrow({ where: { id: ticketId }, select: { currentStatus: true } });
+    if (!isActiveTicketStatus(ticket.currentStatus as TicketStatus)) return 'inactive';
+    const { count } = await tx.actionTaken.updateMany({
+      where: { id: actionId, updatedAt: expected },
+      // Strictly later than the token, even within the same millisecond, so an
+      // old token can never match the new version.
+      data: { ...data, updatedAt: new Date(Math.max(Date.now(), expected.getTime() + 1)) },
+    });
+    return count === 1 ? 'updated' : 'stale';
+  }, LOCKING_TX_OPTIONS);
 }
 
 type ActionTakenRow = NonNullable<Awaited<ReturnType<typeof findAction>>>;
@@ -193,23 +208,44 @@ router.post('/staff/tickets/:ticketNumber/actions', ...staffOnly, async (req: Re
     if (!(await isValidAssignee(performedById))) return invalidAssignee(res);
 
     try {
-      const created = await prisma.actionTaken.create({
-        data: {
-          ticketId: ticket.id,
-          createdById: req.user!.id,
-          performedById,
-          clientRequestId,
-          status: 'PLANNED',
-          actionAt: data.actionAt!,
-          description: data.description!,
-          result: data.result ?? null,
-          followUpRequired: data.followUpRequired ?? false,
-          followUpNote: data.followUpNote ?? null,
-          attachmentNotes: data.attachmentNotes ?? null,
-        },
-        include: ACTION_TAKEN_INCLUDE,
-      });
-      return res.status(201).json(toActionTaken(created));
+      // Share-lock the ticket and re-read its status, so a concurrent resolve
+      // (which takes FOR NO KEY UPDATE on the same row) either sees this action in its
+      // gate or has already committed and this create is refused (BR-10, BR-12).
+      const created = await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticket.id} FOR SHARE`;
+        const fresh = await tx.ticket.findUniqueOrThrow({ where: { id: ticket.id }, select: { currentStatus: true } });
+        if (!isActiveTicketStatus(fresh.currentStatus as TicketStatus)) {
+          // BR-18 before BR-10: the original of a retried request may have
+          // committed while this one waited on the lock (e.g. behind a cancel).
+          const original = clientRequestId
+            ? await tx.actionTaken.findUnique({
+                where: { ticketId_clientRequestId: { ticketId: ticket.id, clientRequestId } },
+                include: ACTION_TAKEN_INCLUDE,
+              })
+            : null;
+          return original ? ({ replay: original } as const) : ({ inactive: true } as const);
+        }
+        const row = await tx.actionTaken.create({
+          data: {
+            ticketId: ticket.id,
+            createdById: req.user!.id,
+            performedById,
+            clientRequestId,
+            status: 'PLANNED',
+            actionAt: data.actionAt!,
+            description: data.description!,
+            result: data.result ?? null,
+            followUpRequired: data.followUpRequired ?? false,
+            followUpNote: data.followUpNote ?? null,
+            attachmentNotes: data.attachmentNotes ?? null,
+          },
+          include: ACTION_TAKEN_INCLUDE,
+        });
+        return { created: row } as const;
+      }, LOCKING_TX_OPTIONS);
+      if ('inactive' in created) return ticketNotActive(res);
+      if ('replay' in created) return replayResponse(res, created.replay, samePayload(created.replay, data, performedById));
+      return res.status(201).json(toActionTaken(created.created));
     } catch (error) {
       // Two parallel requests with the same key: the unique index lets only
       // one insert through; the other returns the row that won (BR-18).
@@ -245,18 +281,21 @@ router.patch('/staff/tickets/:ticketNumber/actions/:actionId', ...staffOnly, asy
     const expected = readExpectedUpdatedAt(body, fields);
     if (Object.keys(fields).length > 0 || !expected) return validationError(res, fields);
 
-    if (isLockedActionStatus(action.status as ActionStatus)) return actionLocked(res);
+    // BR-10 first: on an inactive ticket every action write is TICKET_NOT_ACTIVE,
+    // also for actions a ticket cancel has just cancelled (BR-13).
     if (!isActiveTicketStatus(ticket.currentStatus as TicketStatus)) return ticketNotActive(res);
+    if (isLockedActionStatus(action.status as ActionStatus)) return actionLocked(res);
     if (expected.getTime() !== action.updatedAt.getTime()) return staleUpdate(res, action.id);
 
     const performedById = typeof body.performedById === 'number' ? body.performedById : undefined;
     if (performedById !== undefined && !(await isValidAssignee(performedById))) return invalidAssignee(res);
 
-    const updated = await updateIfUnchanged(action.id, expected, {
+    const outcome = await updateIfUnchanged(ticket.id, action.id, expected, {
       ...data,
       ...(performedById !== undefined ? { performedById } : {}),
     });
-    if (!updated) return staleUpdate(res, action.id);
+    if (outcome === 'inactive') return ticketNotActive(res);
+    if (outcome === 'stale') return staleUpdate(res, action.id);
 
     const fresh = await prisma.actionTaken.findUniqueOrThrow({ where: { id: action.id }, include: ACTION_TAKEN_INCLUDE });
     res.status(200).json(toActionTaken(fresh));
@@ -291,10 +330,12 @@ router.patch('/staff/tickets/:ticketNumber/actions/:actionId/status', ...staffOn
     const expected = readExpectedUpdatedAt(body, fields);
     if (Object.keys(fields).length > 0 || !expected) return validationError(res, fields);
 
-    // A completed or cancelled action is immutable (BR-09), checked before the
-    // transition rule, which then only covers moves between open states.
-    if (isLockedActionStatus(action.status as ActionStatus)) return actionLocked(res);
+    // On an active ticket a completed or cancelled action is immutable (BR-09),
+    // checked before the transition rule, which then only covers open states.
+    // BR-10 first: on an inactive ticket every action write is TICKET_NOT_ACTIVE,
+    // also for actions a ticket cancel has just cancelled (BR-13).
     if (!isActiveTicketStatus(ticket.currentStatus as TicketStatus)) return ticketNotActive(res);
+    if (isLockedActionStatus(action.status as ActionStatus)) return actionLocked(res);
     if (expected.getTime() !== action.updatedAt.getTime()) return staleUpdate(res, action.id);
 
     const from = action.status as ActionStatus;
@@ -311,13 +352,14 @@ router.patch('/staff/tickets/:ticketNumber/actions/:actionId/status', ...staffOn
     }
 
     const now = new Date();
-    const updated = await updateIfUnchanged(action.id, expected, {
+    const outcome = await updateIfUnchanged(ticket.id, action.id, expected, {
       status: target,
       ...(suppliedResult !== undefined ? { result: suppliedResult } : {}),
       ...(target === 'COMPLETED' ? { completedAt: now } : {}),
       ...(target === 'CANCELLED' ? { cancelledAt: now } : {}),
     });
-    if (!updated) return staleUpdate(res, action.id);
+    if (outcome === 'inactive') return ticketNotActive(res);
+    if (outcome === 'stale') return staleUpdate(res, action.id);
 
     const fresh = await prisma.actionTaken.findUniqueOrThrow({ where: { id: action.id }, include: ACTION_TAKEN_INCLUDE });
     res.status(200).json(toActionTaken(fresh));

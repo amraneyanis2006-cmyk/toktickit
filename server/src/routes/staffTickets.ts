@@ -1,11 +1,15 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, TicketStatus as TicketStatusEnum } from '@prisma/client';
 import { requireAuth, requirePasswordChanged, requireRole } from '../middleware/auth';
 import { normalizePagination, validateCommentContent } from '../utils/validation';
-import { isValidTransition } from '../utils/statusTransition';
+import { isValidTransition, legalNextStatuses } from '../utils/statusTransition';
 import type { TicketStatus } from '../utils/statusTransition';
 import { TICKET_HISTORY_INCLUDE, toActionTaken, toStatusChange } from '../utils/ticketHistory';
+import { computeResolutionGate } from '../utils/resolutionGate';
+import { parseIsoDateTime } from '../utils/actionValidation';
+import { LOCKING_TX_OPTIONS } from '../utils/transactions';
+import { OPEN_ACTION_STATUSES } from '../utils/actionTransition';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -219,6 +223,8 @@ router.get(
         })),
         actionsTaken: ticket.actionsTaken.map(toActionTaken),
         statusHistory: ticket.statusChanges.map(toStatusChange),
+        resolutionGate: computeResolutionGate(ticket, ticket.actionsTaken),
+        legalNextStatuses: legalNextStatuses(ticket.currentStatus as TicketStatus),
       });
     } catch (error) {
       console.error('Error fetching staff ticket detail:', error);
@@ -327,9 +333,56 @@ router.patch(
 );
 
 // --------------------------------------------------
-// PATCH /api/staff/tickets/:ticketNumber/status - change Current Status,
-// enforcing the sec 4.7 transition matrix (sec 12, BR-14).
+// PATCH /api/staff/tickets/:ticketNumber/status - change Current Status
+// (Lab 4 api-spec.md sec 8, BR-11..BR-17). Processing order is binding:
+// validate -> 404 -> stale check (optional expectedUpdatedAt) -> matrix ->
+// UNASSIGNED_TICKET -> one transaction: lock the ticket row, re-check status,
+// token and owner on the locked row, resolution gate, conditional update
+// (0 rows -> STALE_UPDATE), append one TicketStatusChange.
 // --------------------------------------------------
+const VALID_STATUSES = Object.values(TicketStatusEnum) as TicketStatus[];
+
+/** Thrown inside the transaction when another request changed the status first. */
+class StaleStatusError extends Error {}
+
+function statusSummary(t: {
+  ticketNumber: string;
+  currentStatus: string;
+  requesterIndicatedResolved: boolean;
+  resolvedAt: Date | null;
+  updatedAt: Date;
+}) {
+  return {
+    ticketNumber: t.ticketNumber,
+    currentStatus: t.currentStatus,
+    requesterIndicatedResolved: t.requesterIndicatedResolved,
+    resolvedAt: t.resolvedAt,
+    updatedAt: t.updatedAt,
+    legalNextStatuses: legalNextStatuses(t.currentStatus as TicketStatus),
+  };
+}
+
+async function staleStatus(res: Response, ticketId: number) {
+  const current = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId } });
+  return res.status(409).json({
+    error: 'STALE_UPDATE',
+    message: 'This ticket was changed by someone else. The latest status is shown.',
+    current: statusSummary(current),
+  });
+}
+
+function unassignedTicket(res: Response) {
+  return res.status(409).json({
+    error: 'UNASSIGNED_TICKET',
+    message: 'An unassigned ticket cannot be resolved or closed.',
+  });
+}
+
+const BLOCKER_MESSAGES: Record<string, string> = {
+  NO_COMPLETED_ACTION: 'complete at least one action',
+  OPEN_ACTIONS: 'complete or cancel the open actions',
+};
+
 router.patch(
   '/staff/tickets/:ticketNumber/status',
   requireAuth,
@@ -338,22 +391,33 @@ router.patch(
   async (req: Request, res: Response) => {
     try {
       const { ticketNumber } = req.params;
-      const target = req.body?.currentStatus as TicketStatus | undefined;
-      const validStatuses: TicketStatus[] = [
-        'NEW', 'OPEN', 'IN_PROGRESS', 'WAITING_FOR_REQUESTER', 'RESOLVED', 'CLOSED', 'REOPENED', 'CANCELLED',
-      ];
+      const requested = req.body?.currentStatus;
+      const rawExpected = req.body?.expectedUpdatedAt;
 
-      if (!target || !validStatuses.includes(target)) {
+      const fields: Record<string, string> = {};
+      if (typeof requested !== 'string' || !VALID_STATUSES.includes(requested as TicketStatus)) {
+        fields.currentStatus = 'currentStatus must be a valid status value.';
+      }
+      // Optional for Lab 3 compatibility; when sent it must be a valid timestamp.
+      const expected = rawExpected === undefined || rawExpected === null ? null : parseIsoDateTime(rawExpected);
+      if (rawExpected !== undefined && rawExpected !== null && !expected) {
+        fields.expectedUpdatedAt = 'expectedUpdatedAt must be an ISO-8601 date-time with a time zone.';
+      }
+      if (Object.keys(fields).length > 0) {
         return res.status(400).json({
           error: 'VALIDATION_ERROR',
-          message: 'currentStatus must be a valid status value.',
+          message: fields.currentStatus ?? fields.expectedUpdatedAt,
+          fields,
         });
       }
+      const target = requested as TicketStatus;
 
       const ticket = await prisma.ticket.findFirst({ where: { ticketNumber: ticketNumber as string } });
       if (!ticket) {
         return res.status(404).json({ error: 'NOT_FOUND', message: 'Ticket not found.' });
       }
+
+      if (expected && expected.getTime() !== ticket.updatedAt.getTime()) return await staleStatus(res, ticket.id);
 
       const current = ticket.currentStatus as TicketStatus;
 
@@ -364,27 +428,89 @@ router.patch(
         });
       }
 
-      if ((target === 'RESOLVED' || target === 'CLOSED') && ticket.ticketOwnerId === null) {
+      if ((target === 'RESOLVED' || target === 'CLOSED') && ticket.ticketOwnerId === null) return unassignedTicket(res);
+
+      const result = await prisma.$transaction(async (tx) => {
+        // Lock the ticket row: Action Taken writes take a share lock on it
+        // (routes/actionsTaken.ts), so no open action can appear between the
+        // gate read below and this commit (BR-12). Everything after the lock
+        // works on the locked row, not on the earlier read.
+        // FOR NO KEY UPDATE still conflicts with the Action Taken FOR SHARE, but
+        // not with the FOR KEY SHARE that comment/note/attachment inserts take.
+        await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticket.id} FOR NO KEY UPDATE`;
+        const locked = await tx.ticket.findUniqueOrThrow({ where: { id: ticket.id } });
+        if (locked.currentStatus !== current) throw new StaleStatusError();
+        if (expected && locked.updatedAt.getTime() !== expected.getTime()) throw new StaleStatusError();
+        // BR-12(a) on the locked row, not on the earlier read.
+        if ((target === 'RESOLVED' || target === 'CLOSED') && locked.ticketOwnerId === null) {
+          return { unassigned: true } as const;
+        }
+        const now = new Date(Math.max(Date.now(), locked.updatedAt.getTime() + 1));
+        if (target === 'RESOLVED') {
+          const actions = await tx.actionTaken.findMany({ where: { ticketId: ticket.id }, select: { status: true } });
+          // The owner was checked just above, so UNASSIGNED cannot be among these blockers.
+          const gate = computeResolutionGate(locked, actions);
+          if (gate.blockers.includes('UNASSIGNED')) return { unassigned: true } as const;
+          const blockers = gate.blockers.filter((b): b is 'NO_COMPLETED_ACTION' | 'OPEN_ACTIONS' => b !== 'UNASSIGNED');
+          if (blockers.length > 0) return { blocked: blockers } as const;
+        }
+
+        const { count } = await tx.ticket.updateMany({
+          // Still the status we read, and - when the client sent a token -
+          // still the exact version it saw (BR-17).
+          where: { id: ticket.id, currentStatus: current, ...(expected ? { updatedAt: expected } : {}) },
+          data: {
+            currentStatus: target,
+            updatedAt: now,
+            ...(target === 'RESOLVED' ? { resolvedAt: now } : {}),
+            ...(target === 'REOPENED' ? { resolvedAt: null, requesterIndicatedResolved: false } : {}),
+          },
+        });
+        // Defence in depth: the locked-row re-check above already catches a
+        // concurrent change, so this guard should never fire.
+        if (count === 0) throw new StaleStatusError();
+
+        // BR-13 (owner decision on PR #70): cancelling a Ticket also cancels its
+        // open Actions Taken, in this same transaction, so no action is left open
+        // on a ticket where BR-10 forbids any further action write.
+        if (target === 'CANCELLED') {
+          await tx.actionTaken.updateMany({
+            where: { ticketId: ticket.id, status: { in: [...OPEN_ACTION_STATUSES] } },
+            data: { status: 'CANCELLED', cancelledAt: now, updatedAt: now },
+          });
+        }
+
+        const statusChange = await tx.ticketStatusChange.create({
+          data: { ticketId: ticket.id, fromStatus: current, toStatus: target, changedById: req.user!.id, changedAt: now },
+          include: { changedBy: { select: { id: true, name: true } } },
+        });
+        const updated = await tx.ticket.findUniqueOrThrow({ where: { id: ticket.id } });
+        return { updated, statusChange } as const;
+      }, LOCKING_TX_OPTIONS);
+
+      if ('unassigned' in result) return unassignedTicket(res);
+      if ('blocked' in result) {
+        const parts = result.blocked.map((b) => BLOCKER_MESSAGES[b]).filter(Boolean);
         return res.status(409).json({
-          error: 'UNASSIGNED_TICKET',
-          message: 'An unassigned ticket cannot be resolved or closed.',
+          error: 'RESOLUTION_BLOCKED',
+          message: `This ticket cannot be resolved yet: ${parts.join(' and ')}.`,
+          blockers: result.blocked,
         });
       }
 
-      const updated = await prisma.ticket.update({
-        where: { id: ticket.id },
-        data: {
-          currentStatus: target,
-          ...(target === 'REOPENED' ? { requesterIndicatedResolved: false } : {}),
-        },
-      });
-
       res.status(200).json({
-        ticketNumber: updated.ticketNumber,
-        currentStatus: updated.currentStatus,
-        requesterIndicatedResolved: updated.requesterIndicatedResolved,
+        ...statusSummary(result.updated),
+        statusChange: toStatusChange(result.statusChange),
       });
     } catch (error) {
+      if (error instanceof StaleStatusError) {
+        try {
+          const ticket = await prisma.ticket.findFirst({ where: { ticketNumber: req.params.ticketNumber as string } });
+          if (ticket) return await staleStatus(res, ticket.id);
+        } catch (recoveryError) {
+          console.error('Error loading the current ticket after a stale update:', recoveryError);
+        }
+      }
       console.error('Error changing ticket status:', error);
       res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Unable to update status.' });
     }
