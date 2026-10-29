@@ -51,8 +51,11 @@ export default function StaffTicketQueue() {
     return o === 'mine' || o === 'unassigned' ? o : 'all';
   });
   const [requesterResolved, setRequesterResolved] = useState(() => searchParams.get('requesterResolved') === 'true');
-  const [fromDashboard, setFromDashboard] = useState(() =>
-    ['status', 'priority', 'ownership', 'requesterResolved'].some((k) => searchParams.has(k)));
+  // The chip shows while the filters still equal the dashboard link (PR #73 review).
+  const filterKey = JSON.stringify([search, status, priority, ownership, requesterResolved]);
+  const [dashboardKey, setDashboardKey] = useState(() =>
+    ['status', 'priority', 'ownership', 'requesterResolved'].some((k) => searchParams.has(k)) ? filterKey : null);
+  const fromDashboard = dashboardKey === filterKey;
   const [sortBy, setSortBy] = useState<SortField>('createdAt');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
@@ -116,7 +119,7 @@ export default function StaffTicketQueue() {
     setPriority('');
     setOwnership('all');
     setRequesterResolved(false);
-    setFromDashboard(false);
+    setDashboardKey(null);
     setSearchParams({}, { replace: true });
     setPage(1);
   };
@@ -313,7 +316,7 @@ export default function StaffTicketQueue() {
               Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, result.pagination.totalItems)} of{' '}
               {result.pagination.totalItems} tickets
             </span>
-            <div className="d-flex align-items-center gap-2">
+            <div className="d-flex flex-wrap align-items-center gap-2">
               <select
                 className="form-select form-select-sm w-auto"
                 value={pageSize}

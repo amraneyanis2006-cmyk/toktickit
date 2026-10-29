@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import { apiFetch, ApiError } from '../api/apiClient';
 import ConfirmDialog from './ConfirmDialog';
 import { formatDateTime, isLocked } from '../utils/actions';
@@ -70,11 +70,9 @@ export default function ActionPanel({
   const onlyResultDirty = current !== null && JSON.stringify({ ...form, result: '' }) === JSON.stringify({ ...formFrom(current, currentUser.id), result: '' });
   const headingRef = useRef<HTMLHeadingElement>(null);
 
-  // ui-spec sec 9: focus moves into the panel and returns to the opener when it closes.
+  // ui-spec sec 9: focus moves into the panel (ActionsTaken returns it to the opener on close).
   useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
     headingRef.current?.focus();
-    return () => opener?.focus();
   }, []);
   const performers = [...staffUsers];
   for (const u of [currentUser, ...(current ? [current.performedBy] : [])]) {
@@ -137,7 +135,8 @@ export default function ActionPanel({
   };
 
   const fields = () => ({
-    actionAt: new Date(form.actionAt).toISOString(),
+    // The input has minute precision: keep the stored seconds while the minute is unchanged.
+    actionAt: current && form.actionAt === toLocalInput(new Date(current.actionAt)) ? current.actionAt : new Date(form.actionAt).toISOString(),
     description: form.description,
     result: form.result.trim() || null,
     followUpRequired: form.followUpRequired,
@@ -172,6 +171,20 @@ export default function ActionPanel({
 
   const close = () => (needsReload ? onSaved() : onClose());
 
+  // ui-spec sec 9: on the < 768 px full-screen sheet, Tab stays inside the panel and Esc closes it.
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (!window.matchMedia?.('(max-width: 767.98px)').matches || (e.target as HTMLElement).closest('[role="dialog"]')) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      close();
+    } else if (e.key === 'Tab') {
+      const items = [...e.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), input, select, textarea, a[href]')];
+      const i = items.indexOf(document.activeElement as HTMLElement);
+      if (e.shiftKey && i <= 0) { e.preventDefault(); items[items.length - 1]?.focus(); }
+      else if (!e.shiftKey && i === items.length - 1) { e.preventDefault(); items[0]?.focus(); }
+    }
+  };
+
   const field = (key: keyof Form, label: string, input: ReactNode, required = false) => (
     <div className="mb-3">
       <label htmlFor={`action-${key}`} className="zg-label">
@@ -189,7 +202,7 @@ export default function ActionPanel({
   });
 
   return (
-    <div className="zg-card zg-sheet p-3 mb-3" aria-label={current ? 'Action details' : 'New action'} role="region">
+    <div className="zg-card zg-sheet p-3 mb-3" aria-label={current ? 'Action details' : 'New action'} role="region" onKeyDown={onKeyDown}>
       <h3 className="h6" ref={headingRef} tabIndex={-1}>{current ? (locked ? 'Action (locked)' : 'Edit action') : 'Add action'}</h3>
       {banner && <div className={`zg-callout-${banner.kind} p-2 mb-3`} role={banner.kind === 'error' ? 'alert' : 'status'}>{banner.text}</div>}
 

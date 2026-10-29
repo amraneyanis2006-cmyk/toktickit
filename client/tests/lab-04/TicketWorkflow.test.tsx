@@ -94,6 +94,27 @@ describe('TicketWorkflow (UI-04)', () => {
     expect(within(history).getByText(/in progress → resolved/i)).toBeInTheDocument();
   });
 
+  it('UI-04: after a network error the chosen status stays selected and Retry sends it again (PR #72 review)', async () => {
+    let calls = 0;
+    setup([ticket(), ticket({ currentStatus: 'WAITING_FOR_REQUESTER', legalNextStatuses: ['IN_PROGRESS', 'RESOLVED', 'CANCELLED'] })], () =>
+      ++calls === 1 ? Promise.reject(new ApiError(0, 'NETWORK_ERROR', 'Unable to reach the TokTickIT API.')) : Promise.resolve({}));
+    await userEvent.selectOptions(await screen.findByLabelText(/current status/i), 'WAITING_FOR_REQUESTER');
+    expect(await screen.findByText(/unable to reach the toktickit api/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/current status/i)).toHaveValue('WAITING_FOR_REQUESTER');
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(statusCalls()).toHaveLength(2));
+    expect(JSON.parse(statusCalls()[1][1].body).currentStatus).toBe('WAITING_FOR_REQUESTER');
+    expect(await screen.findByRole('status')).toHaveTextContent('Status changed to Waiting for requester.');
+  });
+
+  it('UI-04: after cancelling the ticket, focus moves to the status message, not the disabled select (PR #72 review)', async () => {
+    setup([ticket(), ticket({ currentStatus: 'CANCELLED', legalNextStatuses: [] })]);
+    await userEvent.selectOptions(await screen.findByLabelText(/current status/i), 'CANCELLED');
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /yes, cancel ticket/i }));
+    const message = await screen.findByRole('status');
+    await waitFor(() => expect(message).toHaveFocus());
+  });
+
   it('UI-04: the awaiting-review banner shows when the Requester says resolved on an active ticket', async () => {
     setup([ticket({ requesterIndicatedResolved: true })]);
     expect(await screen.findByText('The requester says the problem appears resolved. Review the actions before resolving.')).toHaveClass('zg-callout-info');

@@ -35,7 +35,8 @@ async function main() {
   const notes: string[] = [];
   const add = async (metric: string, api: number, sql: string, ...params: unknown[]) => rows.push([metric, api, await count(sql, ...params)]);
 
-  const requester = await login("sara.lee@example.com");
+  // A seeded Requester with Lab 4 tickets (README dev accounts); LAB4_CHECK_REQUESTER picks another one.
+  const requester = await login(process.env.LAB4_CHECK_REQUESTER ?? "jennifer.anderson@toktickit.test");
   const r = (await request(app).get("/api/dashboard/requester").set("Cookie", requester.cookie)).body;
   const mine = `FROM "Ticket" WHERE "requesterId" = $1 AND`;
   await add("requester.openTickets", r.metrics.openTickets.value, `${mine} "currentStatus" IN ${ACTIVE}`, requester.id);

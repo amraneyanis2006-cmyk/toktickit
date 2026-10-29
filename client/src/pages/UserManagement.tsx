@@ -383,7 +383,10 @@ export default function UserManagement() {
   const [searchParams] = useState(() => new URLSearchParams(window.location.search));
   const [roleFilter, setRoleFilter] = useState(() => searchParams.get('role') ?? '');
   const [activeFilter, setActiveFilter] = useState(() => searchParams.get('isActive') ?? '');
-  const [fromDashboard, setFromDashboard] = useState(() => searchParams.has('role') || searchParams.has('isActive'));
+  // The chip shows while the filters still equal the dashboard link (PR #73 review).
+  const filterKey = JSON.stringify([search, roleFilter, activeFilter]);
+  const [dashboardKey, setDashboardKey] = useState(() => (searchParams.has('role') || searchParams.has('isActive') ? filterKey : null));
+  const fromDashboard = dashboardKey === filterKey;
   const [activeAdminCount, setActiveAdminCount] = useState<number | null>(null);
   const [panel, setPanel] = useState<PanelState>(null);
   const [notice, setNotice] = useState('');
@@ -431,7 +434,7 @@ export default function UserManagement() {
     setSearch('');
     setRoleFilter('');
     setActiveFilter('');
-    setFromDashboard(false);
+    setDashboardKey(null);
     window.history.replaceState(window.history.state, '', window.location.pathname);
   };
 
@@ -581,15 +584,15 @@ export default function UserManagement() {
           <div className="d-md-none d-flex flex-column gap-3">
             {users.map((u) => (
               <div key={u.id} className="zg-card p-3">
-                <div className="d-flex justify-content-between align-items-start mb-2">
-                  <div>
-                    <div className="fw-semibold">
+                <div className="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <div style={{ minWidth: 0 }}>
+                    <div className="fw-semibold text-break">
                       {u.name}
                       {u.id === me?.id && <span className="text-muted small"> (you)</span>}
                     </div>
-                    <div className="text-muted small">{u.email}</div>
+                    <div className="text-muted small text-break">{u.email}</div>
                   </div>
-                  <div className="d-flex gap-1 flex-wrap justify-content-end">
+                  <div className="d-flex gap-1 flex-wrap justify-content-end flex-shrink-0">
                     <RoleBadge role={u.role} />
                     <ActiveBadge isActive={u.isActive} />
                   </div>
