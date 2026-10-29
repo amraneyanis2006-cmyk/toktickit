@@ -37,7 +37,7 @@ export const E2E_STAFF_LEAVING_SHOT = { email: 'e2e-staff-leaving-shot@example.c
 export const L4 = {
   severalActions: 'TKT-L4E-000101', // read-only: one action in every status (+ follow-up)
   noAction: 'TKT-L4E-000102', // read-only: active, no action -> Resolved disabled
-  awaitingReview: 'TKT-L4E-000103', // read-only: requesterIndicatedResolved
+  awaitingReview: 'TKT-L4E-000103', // requesterIndicatedResolved; SHOT-01 adds a comment + attachment (regression screen)
   lifecycle: 'TKT-L4E-000104', // E2E-03
   resolution: 'TKT-L4E-000105', // E2E-04
   requesterResolves: 'TKT-L4E-000106', // E2E-05

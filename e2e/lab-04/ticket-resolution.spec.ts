@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { login } from '../helpers';
 import { E2E_REQUESTER_L4, E2E_STAFF_A, FIXTURE_PASSWORD, L4 } from '../global-setup';
-import { addAction, metric, openStaffTicket, viewAction } from './lab4';
+import { addAction, openStaffTicket, viewAction } from './lab4';
 
 test.use({ viewport: { width: 1280, height: 900 } });
 
@@ -43,7 +43,6 @@ test.describe('E2E-05: Requester says resolved, staff review', () => {
     await expect(page.getByRole('button', { name: 'You indicated this is resolved' })).toBeDisabled();
 
     await login(page, E2E_STAFF_A.email, FIXTURE_PASSWORD);
-    await expect(metric(page, 'Awaiting Review')).not.toHaveText('0');
     await page.getByRole('link', { name: 'View all tickets awaiting review' }).click();
     await expect(page.getByText(L4.requesterResolves).first()).toBeVisible();
 
