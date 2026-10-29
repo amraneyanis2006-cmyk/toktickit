@@ -344,6 +344,7 @@ export default function StaffTicketDetail() {
         actions={ticket.actionsTaken ?? []}
         staffUsers={staffUsers}
         currentUser={user ? { id: user.id, name: user.name } : undefined}
+        canAdd={ACTIVE.includes(ticket.currentStatus)}
         onChanged={loadTicket}
       />
 

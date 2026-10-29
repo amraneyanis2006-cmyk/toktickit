@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { apiFetch, ApiError } from '../api/apiClient';
 import ConfirmDialog from './ConfirmDialog';
@@ -66,6 +66,16 @@ export default function ActionPanel({
   // A concurrent change (locked, ticket inactive) freezes the panel until it is closed and reloaded.
   const locked = (current !== null && isLocked(current)) || needsReload;
   const dirty = current !== null && JSON.stringify(form) !== JSON.stringify(formFrom(current, currentUser.id));
+  // Complete sends only status + result, so it may only carry an unsaved Result.
+  const onlyResultDirty = current !== null && JSON.stringify({ ...form, result: '' }) === JSON.stringify({ ...formFrom(current, currentUser.id), result: '' });
+  const headingRef = useRef<HTMLHeadingElement>(null);
+
+  // ui-spec sec 9: focus moves into the panel and returns to the opener when it closes.
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    headingRef.current?.focus();
+    return () => opener?.focus();
+  }, []);
   const performers = [...staffUsers];
   for (const u of [currentUser, ...(current ? [current.performedBy] : [])]) {
     if (!performers.some((p) => p.id === u.id)) performers.push(u.id === currentUser.id ? u : { ...u, name: `${u.name} (inactive)` });
@@ -98,11 +108,9 @@ export default function ActionPanel({
       setNeedsReload(true);
     } else if (api?.code === 'INVALID_ASSIGNEE') {
       setErrors({ performedById: MESSAGES.assignee });
-    } else if (api?.code === 'TICKET_NOT_ACTIVE') {
-      setBanner({ kind: 'error', text: MESSAGES.notActive });
-      setNeedsReload(true);
-    } else if (api?.code === 'ACTION_LOCKED' || api?.code === 'INVALID_ACTION_TRANSITION') {
-      setBanner({ kind: 'error', text: api.message });
+    } else if (api?.code === 'TICKET_NOT_ACTIVE' || api?.code === 'ACTION_LOCKED' || api?.code === 'INVALID_ACTION_TRANSITION') {
+      if (current) setUnsaved(form); // the panel turns read-only; keep the typed text visible
+      setBanner({ kind: 'error', text: api.code === 'TICKET_NOT_ACTIVE' ? MESSAGES.notActive : api.message });
       setNeedsReload(true);
     } else if (api?.fields) {
       setErrors(api.fields);
@@ -182,7 +190,7 @@ export default function ActionPanel({
 
   return (
     <div className="zg-card zg-sheet p-3 mb-3" aria-label={current ? 'Action details' : 'New action'} role="region">
-      <h3 className="h6">{current ? (locked ? 'Action (locked)' : 'Edit action') : 'Add action'}</h3>
+      <h3 className="h6" ref={headingRef} tabIndex={-1}>{current ? (locked ? 'Action (locked)' : 'Edit action') : 'Add action'}</h3>
       {banner && <div className={`zg-callout-${banner.kind} p-2 mb-3`} role={banner.kind === 'error' ? 'alert' : 'status'}>{banner.text}</div>}
 
       {locked && current ? (
@@ -250,7 +258,7 @@ export default function ActionPanel({
         )}
         {current && !locked && (
           <>
-            <button type="button" className="btn btn-sm btn-zg-secondary" disabled={busy || (dirty && form.result === (current.result ?? ''))} onClick={() => changeStatus('COMPLETED')}>Complete</button>
+            <button type="button" className="btn btn-sm btn-zg-secondary" disabled={busy || (dirty && !onlyResultDirty)} onClick={() => changeStatus('COMPLETED')}>Complete</button>
             <button type="button" className="btn btn-sm btn-zg-tertiary" disabled={busy || dirty} onClick={() => setConfirmCancel(true)}>Cancel action</button>
           </>
         )}

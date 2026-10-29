@@ -56,9 +56,11 @@ function FollowUp({ action }: { action: ActionTaken }) {
 }
 
 export default function ActionsTaken({
-  ticketNumber, actions, staffUsers = [], currentUser, readOnly = false, onChanged,
+  ticketNumber, actions, staffUsers = [], currentUser, readOnly = false, canAdd = true, onChanged,
 }: {
   ticketNumber: string;
+  /** false on an inactive ticket (BR-10): no new action can be recorded. */
+  canAdd?: boolean;
   actions: ActionTaken[];
   staffUsers?: StaffUser[];
   currentUser?: { id: number; name: string };
@@ -74,7 +76,7 @@ export default function ActionsTaken({
     <section className="mb-4">
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h2 className="h6 mb-0">{title}</h2>
-        {!readOnly && panel === undefined && (
+        {!readOnly && canAdd && panel === undefined && (
           <button type="button" className="btn btn-sm btn-zg-primary" onClick={() => setPanel(null)}>Add Action</button>
         )}
       </div>
@@ -117,7 +119,7 @@ export default function ActionsTaken({
                     <td><FollowUp action={a} /></td>
                     <td className="small" style={{ wordBreak: 'break-word' }}>{a.attachmentNotes}</td>
                     {!readOnly && (
-                      <td><button type="button" className="btn btn-sm btn-zg-secondary" onClick={() => setPanel(a)} aria-label={`View action: ${a.description}`}>View</button></td>
+                      <td><button type="button" className="btn btn-sm btn-zg-secondary" disabled={panel !== undefined} onClick={() => setPanel(a)} aria-label={`View action: ${a.description}`}>View</button></td>
                     )}
                   </tr>
                 ))}
@@ -137,7 +139,7 @@ export default function ActionsTaken({
                 {a.attachmentNotes && <div className="small"><span className="zg-label d-inline">Attachment notes: </span>{a.attachmentNotes}</div>}
                 <FollowUp action={a} />
                 {!readOnly && (
-                  <button type="button" className="btn btn-sm btn-zg-secondary w-100 mt-2" style={{ minHeight: 44 }} onClick={() => setPanel(a)} aria-label={`View action: ${a.description}`}>View</button>
+                  <button type="button" className="btn btn-sm btn-zg-secondary w-100 mt-2" style={{ minHeight: 44 }} disabled={panel !== undefined} onClick={() => setPanel(a)} aria-label={`View action: ${a.description}`}>View</button>
                 )}
               </div>
             ))}

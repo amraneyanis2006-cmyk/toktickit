@@ -134,15 +134,26 @@ describe('ActionsTaken (UI-03)', () => {
     await waitFor(() => expect(JSON.parse((apiFetch as any).mock.calls[0][1].body)).toMatchObject({ status: 'CANCELLED' }));
   });
 
-  it('UI-03: View on another row while a panel is open shows and saves that row (not the previous one)', async () => {
+  it('UI-03: while a panel is open the other rows cannot be opened (no unsaved draft is dropped); closing returns focus', async () => {
     renderList([action({ id: 1, description: 'first' }), action({ id: 2, description: 'second', actionAt: '2026-10-28T04:00:00.000Z' })]);
     const views = within(desktopTable()).getAllByRole('button', { name: /view/i });
     await userEvent.click(views[0]!);
+    expect(screen.getByRole('heading', { name: /edit action/i })).toHaveFocus();
+    for (const v of within(desktopTable()).getAllByRole('button', { name: /view/i })) expect(v).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: /close/i }));
+    expect(views[0]).toHaveFocus();
     await userEvent.click(views[1]!);
     expect(screen.getByLabelText(/action description/i)).toHaveValue('second');
-    await userEvent.type(screen.getByLabelText(/action description/i), '!');
+  });
+
+  it('UI-03: an edit refused with TICKET_NOT_ACTIVE keeps the typed text visible in the frozen panel', async () => {
+    (apiFetch as any).mockRejectedValueOnce(new ApiError(409, 'TICKET_NOT_ACTIVE', 'x'));
+    renderList([action()]);
+    await userEvent.click(within(desktopTable()).getByRole('button', { name: /view/i }));
+    await userEvent.type(screen.getByLabelText(/action description/i), ' plus my edit');
     await userEvent.click(screen.getByRole('button', { name: /save changes/i }));
-    await waitFor(() => expect((apiFetch as any).mock.calls[0][0]).toBe('/staff/tickets/TKT-2026-000001/actions/2'));
+    expect(await screen.findByText(/no longer active/i)).toBeInTheDocument();
+    expect(screen.getByText('Reset the Wi-Fi profile. plus my edit')).toBeInTheDocument();
   });
 
   it('UI-03: a locked action opens read-only with only Close', async () => {
