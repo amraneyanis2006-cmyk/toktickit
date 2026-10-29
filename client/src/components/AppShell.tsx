@@ -34,7 +34,7 @@ export default function AppShell() {
               {user?.role === 'REQUESTER' && (
                 <>
                   <li className="nav-item">
-                    <NavLink to="/tickets" end className="nav-link">
+                    <NavLink to="/tickets" className="nav-link">
                       📄 My Tickets
                     </NavLink>
                   </li>

@@ -225,11 +225,11 @@ export default function MyTickets() {
             ))}
           </select>
         </div>
-        {resolvedWithinDays && (
+        {searchParams.get('resolvedWithinDays') && (
           <div className="col-12 form-check ms-1">
-            <input id="resolvedWithin" type="checkbox" className="form-check-input" checked
-              onChange={() => { setResolvedWithinDays(''); setPage(1); }} />
-            <label htmlFor="resolvedWithin" className="form-check-label small">Resolved in the last {resolvedWithinDays} days</label>
+            <input id="resolvedWithin" type="checkbox" className="form-check-input" checked={Boolean(resolvedWithinDays)}
+              onChange={(e) => { setResolvedWithinDays(e.target.checked ? searchParams.get('resolvedWithinDays')! : ''); setPage(1); }} />
+            <label htmlFor="resolvedWithin" className="form-check-label small">Resolved in the last {searchParams.get('resolvedWithinDays')} days</label>
           </div>
         )}
       </div>
