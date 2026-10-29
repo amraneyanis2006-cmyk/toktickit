@@ -273,6 +273,8 @@ Open `http://localhost:5173` and log in. Seeded credentials (**local development
 | IT Staff | `alex.kim@example.com` | `DevPass123!` |
 | Administrator | `admin@example.com` | `DevPass123!` |
 
+`npm run lab4:metrics-check` logs in with these accounts; set `LAB4_CHECK_PASSWORD` if your seed uses another password (the fallback is `DevPass123!`).
+
 ## Running Tests (Lab 3)
 
 From the repository root:

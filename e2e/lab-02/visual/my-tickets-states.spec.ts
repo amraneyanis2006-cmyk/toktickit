@@ -10,6 +10,7 @@ test.describe('My Tickets screenshot states (desktop)', () => {
   test('loaded state', async ({ page }) => {
     // Requester with tickets (per manual verification, ID 1 has 16).
     await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
+    await page.goto('/tickets'); // CHG-01: login now lands on /dashboard
     await page.waitForSelector('tbody tr');
     await page.screenshot({
       path: 'artifacts/lab-02/screenshots/my-tickets/loaded.png',
@@ -20,6 +21,7 @@ test.describe('My Tickets screenshot states (desktop)', () => {
   test('empty state (Requester with zero tickets ever)', async ({ page }) => {
     // Requester with 0 tickets (per manual verification, ID 2).
     await login(page, E2E_REQUESTER_B.email, FIXTURE_PASSWORD);
+    await page.goto('/tickets'); // CHG-01: login now lands on /dashboard
     await page.waitForSelector('text=You haven\'t created any tickets yet.');
     await page.screenshot({
       path: 'artifacts/lab-02/screenshots/my-tickets/empty.png',
@@ -29,6 +31,7 @@ test.describe('My Tickets screenshot states (desktop)', () => {
 
   test('no-results state (filters match nothing)', async ({ page }) => {
     await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
+    await page.goto('/tickets'); // CHG-01: login now lands on /dashboard
     await page.waitForSelector('tbody tr');
     await page.fill('input[type="search"]', 'zzz-no-such-ticket-zzz');
     await page.waitForSelector('text=No tickets match your filters.');
@@ -40,6 +43,7 @@ test.describe('My Tickets screenshot states (desktop)', () => {
 
   test('filtered state (filter matches a subset)', async ({ page }) => {
     await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
+    await page.goto('/tickets'); // CHG-01: login now lands on /dashboard
     await page.waitForSelector('tbody tr');
     // Select the priority filter (2nd select) and pick a real option.
     const selects = page.locator('select.form-select');
@@ -56,6 +60,7 @@ test.describe('My Tickets screenshot states (mobile)', () => {
   test('mobile-cards state', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
+    await page.goto('/tickets'); // CHG-01: login now lands on /dashboard
     await page.waitForSelector('.d-md-none .zg-card.p-3');
     await page.screenshot({
       path: 'artifacts/lab-02/screenshots/my-tickets/mobile-cards.png',

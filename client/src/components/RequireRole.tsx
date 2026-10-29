@@ -25,7 +25,7 @@ export default function RequireRole({ allowedRoles }: RequireRoleProps) {
 
   if (!allowedRoles.includes(user.role)) {
     return (
-      <Navigate to={defaultRouteForRole(user.role)} replace state={{ forbiddenFrom: location.pathname }} />
+      <Navigate to={defaultRouteForRole()} replace state={{ forbiddenFrom: location.pathname }} />
     );
   }
 

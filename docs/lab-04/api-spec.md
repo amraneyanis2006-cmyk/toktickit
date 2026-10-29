@@ -201,6 +201,8 @@ The Lab 3 endpoint supports only `search` and `role` and returns a plain array (
 |---|---|---|
 | `isActive` | `true\|false` | `isActive = value` |
 
+Any other `isActive` value → `400 VALIDATION_ERROR` with `fields.isActive` (added after the PR #71 review). `role` keeps its Lab 3 behaviour (an unknown value is ignored).
+
 The UI initialises its `role` and `isActive` filters from the URL
 (`/admin/users?role=IT_STAFF&isActive=true`). For this list the drill-down equality
 (BR-26) compares the card value with the length of the returned array.
@@ -338,7 +340,7 @@ each with drill-down `/staff/tickets?status=<S>` or
 | Status | Codes |
 |---|---|
 | 200 | idempotent replay of an Action Taken create |
-| 400 | `VALIDATION_ERROR` (Action Taken fields, unknown status in list filter, missing `expectedUpdatedAt` on Action Taken updates, invalid `currentStatus` or `expectedUpdatedAt` on the ticket status change) |
+| 400 | `VALIDATION_ERROR` (Action Taken fields, unknown status in list filter, invalid `isActive` on `GET /api/admin/users`, missing `expectedUpdatedAt` on Action Taken updates, invalid `currentStatus` or `expectedUpdatedAt` on the ticket status change) |
 | 409 | `RESOLUTION_BLOCKED`, `STALE_UPDATE`, `INVALID_ACTION_TRANSITION`, `ACTION_LOCKED`, `TICKET_NOT_ACTIVE`, `IDEMPOTENCY_KEY_REUSED` (+ Lab 3 codes) |
 | 422 | `INVALID_ASSIGNEE` (+ Lab 3 `INVALID_OWNER`) |
 | 503 | `GET /api/health/db` with database unreachable |

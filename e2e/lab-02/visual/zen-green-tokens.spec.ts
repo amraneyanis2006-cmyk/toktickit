@@ -9,6 +9,7 @@ test.describe('VIS-01: Zen Green token conformance', () => {
 
   test('header uses the --zg-primary background token', async ({ page }) => {
     await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
+    await page.goto('/tickets'); // CHG-01: login now lands on /dashboard
     await page.locator('.zg-header').waitFor({ state: 'visible' });
 
     const headerBg = await page.evaluate(() => {
@@ -46,6 +47,7 @@ test.describe('VIS-01: Zen Green token conformance', () => {
 
   test('badges render with token-defined colors on Ticket Detail', async ({ page }) => {
     await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
+    await page.goto('/tickets'); // CHG-01: login now lands on /dashboard
     await page.waitForSelector('tbody tr');
     await page.locator('tbody tr').first().click();
     await page.waitForURL('**/tickets/TKT-*');

@@ -16,7 +16,7 @@ export default function ChangePassword() {
   const [bannerError, setBannerError] = useState('');
 
   if (user && !user.mustChangePassword) {
-    return <Navigate to="/tickets" replace />;
+    return <Navigate to="/" replace />;
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -40,7 +40,7 @@ export default function ChangePassword() {
         body: JSON.stringify({ currentPassword, newPassword }),
       });
       await refresh();
-      navigate('/tickets');
+      navigate('/');
     } catch (err) {
       if (err instanceof ApiError && err.fields) {
         setFieldErrors(err.fields);

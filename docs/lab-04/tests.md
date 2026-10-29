@@ -67,7 +67,7 @@ Planned before implementation (Spec DD → Test DD → TDD). Every AC in
 | DASH-06 | API | AC-19 | Requester dashboard authorization | IT Staff/Admin → 403; no session → 401 | server/tests/lab-04/requester-dashboard.api.test.ts | Planned |
 | DASH-07 | API | AC-16, BR-21 | Staff metrics vs SQL | Every metric, all byStatus and byItPriority keys equal raw SQL counts | server/tests/lab-04/staff-dashboard.api.test.ts | Planned |
 | DASH-08 | API | AC-17, BR-26 | Staff drill-down equality | GET /api/staff/tickets with each drillDown query → totalItems = metric value | server/tests/lab-04/staff-dashboard.api.test.ts | Planned |
-| DASH-09 | API | AC-19, BR-27 | Staff dashboard authorization | Requester → 403; no session → 401; IT Staff has no userAccounts; Admin has userAccounts equal to SQL | server/tests/lab-04/staff-dashboard.api.test.ts | Planned |
+| DASH-09 | API | AC-19, BR-27 | Staff dashboard authorization | Requester → 403; no session → 401; IT Staff has no userAccounts; Admin has userAccounts equal to SQL; an invalid `isActive` on the users drill-down → 400 `VALIDATION_ERROR` (`fields.isActive`) | server/tests/lab-04/staff-dashboard.api.test.ts | Planned |
 | DASH-10 | API | AC-18 | Staff member with no open actions | myOpenActions 0 and [] | server/tests/lab-04/staff-dashboard.api.test.ts | Planned |
 | DASH-11 | API | §5.2 table | Lists | ≤ 5 items, documented order, only documented fields | server/tests/lab-04/staff-dashboard.api.test.ts | Planned |
 | DASH-12 | API | AC-14 | awaitingReview | Counts active Tickets with requesterIndicatedResolved = true only | server/tests/lab-04/staff-dashboard.api.test.ts | Planned |
@@ -146,7 +146,8 @@ Planned before implementation (Spec DD → Test DD → TDD). Every AC in
 `scripts/lab4-metrics-check.ts` — logs in as a chosen Requester, IT Staff, and
 Administrator, calls both dashboard endpoints, runs the equivalent raw SQL for every
 metric, and prints a table `metric | API | SQL | match`; output saved to
-`artifacts/lab-04/metrics-check.txt` (Answer Part 5).
+`artifacts/lab-04/metrics-check.txt` (Answer Part 5). It logs in with `LAB4_CHECK_PASSWORD` from the environment, falling back to
+the README dev seed password (`DevPass123!`, local only).
 
 ## 12. Acceptance-Criterion Traceability
 
