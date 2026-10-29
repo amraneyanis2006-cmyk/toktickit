@@ -15,6 +15,11 @@
   --zg-warning-bg: #FDF3D8;
   --zg-success-bg: #EAF6EF;
   --zg-focus-ring: #0B7A46;
+  /* Lab 4 (ui-spec sec 1) */
+  --zg-info-bg: #E7F0FA;
+  --zg-info-text: #1F5F9C;
+  --zg-neutral-bg: #E8ECE9;
+  --zg-neutral-text: #4C5C54;
 }
 
 body {
@@ -214,5 +219,53 @@ body {
     min-height: 44px;
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
+  }
+}
+
+/* Lab 4 Action Taken, follow-up and awaiting-review badges (ui-spec sec 1) */
+.zg-badge-action-planned {
+  background-color: var(--zg-neutral-bg);
+  color: var(--zg-neutral-text);
+}
+
+.zg-badge-action-in_progress {
+  background-color: var(--zg-warning-bg);
+  color: var(--zg-warning);
+}
+
+.zg-badge-action-completed {
+  background-color: var(--zg-pale);
+  color: var(--zg-primary);
+}
+
+.zg-badge-action-cancelled {
+  background-color: var(--zg-error-bg);
+  color: var(--zg-text-muted);
+}
+
+.zg-badge-followup {
+  background-color: #FCE7D6;
+  color: #C2540D;
+}
+
+.zg-badge-awaiting-review {
+  background-color: var(--zg-info-bg);
+  color: var(--zg-info-text);
+}
+
+/* Action panel: full-screen sheet with full-width 44 px buttons below 768 px (ui-spec sec 6, 8) */
+@media (max-width: 767.98px) {
+  .zg-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 1040;
+    overflow-y: auto;
+    border-radius: 0;
+    margin: 0 !important;
+  }
+
+  .zg-sheet .btn {
+    width: 100%;
+    min-height: 44px;
   }
 }

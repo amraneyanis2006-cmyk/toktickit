@@ -165,6 +165,8 @@ your ticket"; no Created-by column (shows Performed by only).
   "Assign a Ticket Owner first.". CANCELLED keeps its confirmation dialog; when the Ticket has open actions
   (PLANNED or IN_PROGRESS in `actionsTaken`) the dialog adds "This also cancels 1 open
   action." or "This also cancels {n} open actions." (n ≥ 2); with none, no extra line.
+- Every status change sends `expectedUpdatedAt` except CANCELLED (Lab 3 request body
+  kept; see spec §11 item 10 (l)).
 - The backend stays the authority: a `409 RESOLUTION_BLOCKED` /
   `INVALID_TRANSITION` / `STALE_UPDATE` shows a `zg-callout-error` with the
   server message, the selection is reset, and the Ticket reloads.

@@ -4,6 +4,8 @@ export class ApiError extends Error {
   status: number;
   code: string;
   fields?: Record<string, string>;
+  /** Full error body, e.g. `current` (STALE_UPDATE) or `blockers` (RESOLUTION_BLOCKED). */
+  details?: Record<string, unknown>;
 
   constructor(status: number, code: string, message: string, fields?: Record<string, string>) {
     super(message);
@@ -54,12 +56,14 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   }
 
   if (!response.ok) {
-    throw new ApiError(
+    const error = new ApiError(
       response.status,
       body?.error ?? 'UNKNOWN_ERROR',
       body?.message ?? 'An unexpected error occurred.',
       body?.fields
     );
+    error.details = body ?? undefined;
+    throw error;
   }
 
   return body as T;

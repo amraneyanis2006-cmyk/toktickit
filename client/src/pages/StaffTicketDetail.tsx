@@ -2,13 +2,10 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { apiFetch, ApiError } from '../api/apiClient';
 import { useAuth } from '../context/AuthContext';
-import { legalNextStatuses } from '../utils/statusTransition';
 import type { TicketStatus } from '../utils/statusTransition';
-
-interface StaffUser {
-  id: number;
-  name: string;
-}
+import ActionsTaken from '../components/ActionsTaken';
+import type { ActionTaken, StaffUser } from '../components/ActionsTaken';
+import TicketWorkflow, { StatusHistory } from '../components/TicketWorkflow';
 
 interface Comment {
   id: number;
@@ -53,17 +50,21 @@ interface StaffTicketDetailResponse {
   attachments: Attachment[];
   publicComments: Comment[];
   internalNotes: Note[];
+  // Lab 4 (api-spec sec 1); optional so older responses still render.
+  resolvedAt?: string | null;
+  actionsTaken?: ActionTaken[];
+  statusHistory?: Array<{ id: number; fromStatus: string; toStatus: string; changedBy: { id: number; name: string }; changedAt: string }>;
+  resolutionGate?: { canResolve: boolean; blockers: string[] };
+  legalNextStatuses?: TicketStatus[];
 }
+
+const ACTIVE: TicketStatus[] = ['NEW', 'OPEN', 'IN_PROGRESS', 'WAITING_FOR_REQUESTER', 'REOPENED'];
 
 type FetchState = 'loading' | 'success' | 'not-found' | 'forbidden' | 'error';
 
 function PriorityBadge({ value }: { value: string | null }) {
   if (!value) return <span className="text-muted small">Not set</span>;
   return <span className={`zg-badge zg-badge-priority-${value.toLowerCase()}`}>{value}</span>;
-}
-
-function StatusBadge({ value }: { value: string }) {
-  return <span className={`zg-badge zg-badge-status-${value.toLowerCase()}`}>{value.replace(/_/g, ' ')}</span>;
 }
 
 function formatDate(iso: string) {
@@ -86,11 +87,6 @@ export default function StaffTicketDetail() {
 
   const [savingPriority, setSavingPriority] = useState(false);
   const [priorityError, setPriorityError] = useState('');
-
-  const [statusChoice, setStatusChoice] = useState('');
-  const [savingStatus, setSavingStatus] = useState(false);
-  const [statusError, setStatusError] = useState('');
-  const [confirmCancel, setConfirmCancel] = useState(false);
 
   const [commentText, setCommentText] = useState('');
   const [postingComment, setPostingComment] = useState(false);
@@ -180,33 +176,6 @@ export default function StaffTicketDetail() {
     }
   };
 
-  const submitStatusChange = async (target: string) => {
-    setSavingStatus(true);
-    setStatusError('');
-    try {
-      await apiFetch(`/staff/tickets/${ticketNumber}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ currentStatus: target }),
-      });
-      await loadTicket();
-      setStatusChoice('');
-    } catch (err) {
-      setStatusError(err instanceof ApiError ? err.message : 'Unable to update status.');
-    } finally {
-      setSavingStatus(false);
-      setConfirmCancel(false);
-    }
-  };
-
-  const handleStatusSelect = (value: string) => {
-    setStatusChoice(value);
-    if (value === 'CANCELLED') {
-      setConfirmCancel(true);
-      return;
-    }
-    if (value) submitStatusChange(value);
-  };
-
   const handlePostComment = async () => {
     const trimmed = commentText.trim();
     if (!trimmed) return;
@@ -265,8 +234,6 @@ export default function StaffTicketDetail() {
     );
   }
 
-  const legalStatuses = legalNextStatuses(ticket.currentStatus);
-
   return (
     <div className="zg-card p-4" style={{ maxWidth: '960px' }}>
       <nav className="mb-3 small">
@@ -274,6 +241,13 @@ export default function StaffTicketDetail() {
       </nav>
 
       <h1 className="h4 mb-4">Ticket Detail</h1>
+
+      {ticket.requesterIndicatedResolved && ACTIVE.includes(ticket.currentStatus) && (
+        <div className="d-flex flex-wrap align-items-center gap-2 mb-4">
+          <span className="zg-badge zg-badge-awaiting-review">Requester says resolved</span>
+          <div className="zg-callout-info p-2 flex-grow-1">The requester says the problem appears resolved. Review the actions before resolving.</div>
+        </div>
+      )}
 
       <div className="row mb-3">
         <div className="col-md-4 mb-3">
@@ -359,37 +333,20 @@ export default function StaffTicketDetail() {
         </div>
 
         <div className="col-md-3 mb-3">
-          <label htmlFor="currentStatus" className="zg-label">Current Status</label>
-          <div className="mb-1"><StatusBadge value={ticket.currentStatus} /></div>
-          <select
-            id="currentStatus"
-            className="form-select form-select-sm"
-            value={statusChoice}
-            onChange={(e) => handleStatusSelect(e.target.value)}
-            disabled={savingStatus || legalStatuses.length === 0}
-          >
-            <option value="">{legalStatuses.length === 0 ? 'No transitions available' : 'Change to...'}</option>
-            {legalStatuses.map((s) => (
-              <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
-            ))}
-          </select>
-          {statusError && <div className="zg-field-error">{statusError}</div>}
+          <TicketWorkflow ticket={ticket} onChanged={loadTicket} />
         </div>
       </div>
 
-      {confirmCancel && (
-        <div className="zg-callout-error mb-4" role="alertdialog">
-          <p className="mb-2 fw-semibold">Cancel this ticket? This cannot be undone.</p>
-          <div className="d-flex gap-2">
-            <button type="button" className="btn btn-sm btn-zg-destructive" onClick={() => submitStatusChange('CANCELLED')} disabled={savingStatus}>
-              Yes, cancel ticket
-            </button>
-            <button type="button" className="btn btn-sm btn-zg-secondary" onClick={() => { setConfirmCancel(false); setStatusChoice(''); }}>
-              Never mind
-            </button>
-          </div>
-        </div>
-      )}
+      <hr className="my-4" />
+
+      <ActionsTaken
+        ticketNumber={ticket.ticketNumber}
+        actions={ticket.actionsTaken ?? []}
+        staffUsers={staffUsers}
+        currentUser={user ? { id: user.id, name: user.name } : undefined}
+        canAdd={ACTIVE.includes(ticket.currentStatus)}
+        onChanged={loadTicket}
+      />
 
       <hr className="my-4" />
 
@@ -474,6 +431,9 @@ export default function StaffTicketDetail() {
           ))}
         </ul>
       )}
+
+      <hr className="my-4" />
+      <StatusHistory history={ticket.statusHistory} />
     </div>
   );
 }

@@ -209,7 +209,9 @@ The UI initialises its `role` and `isActive` filters from the URL
 
 - **Request** `{ "currentStatus": "RESOLVED", "expectedUpdatedAt": "2026-10-28T03:40:12.000Z" }`
   (`expectedUpdatedAt` optional for Lab 3 compatibility - omitted or `null` means not
-  sent; always sent by the Lab 4 UI).
+  sent; sent by the Lab 4 UI for every transition except CANCELLED, whose request body
+  stays the Lab 3 one - the locked-row status re-check still rejects a concurrent
+  status change).
 - **Processing order:** validate value → load ticket (404) → stale check (409
   `STALE_UPDATE`) → matrix (409 `INVALID_TRANSITION`) → owner check for
   RESOLVED/CLOSED (409 `UNASSIGNED_TICKET`) → **one transaction**: lock the ticket
