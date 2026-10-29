@@ -93,6 +93,8 @@ router.get(
           { email: { contains: search, mode: 'insensitive' } },
         ];
       }
+      // Lab 4 drill-down (api-spec sec 7.3): optional isActive=true|false.
+      if (req.query.isActive === 'true' || req.query.isActive === 'false') where.isActive = req.query.isActive === 'true';
       if ((ROLES as readonly string[]).includes(roleParam)) {
         where.role = roleParam as RoleValue;
       }

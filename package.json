@@ -37,6 +37,7 @@
     "test:server": "npm run test --prefix server",
     "test:client": "npm run test --prefix client",
     "test": "npm run test:server && npm run test:client",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "lab4:metrics-check": "tsx scripts/lab4-metrics-check.ts"
   }
 }

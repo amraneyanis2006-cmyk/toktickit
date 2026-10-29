@@ -159,4 +159,15 @@ describe('Lab 4 authorization (backend-enforced)', () => {
     }
     expect(await prisma.actionTaken.count({ where: { ticketId } })).toBe(1);
   });
+  it('SEC-05: an unknown status filter value (single or in a list) is 400 VALIDATION_ERROR with fields.status, never 500', async () => {
+    const requesterCookie = await loginAs(fx.requesterA.email);
+    for (const [path, cookie] of [['/api/tickets', requesterCookie], ['/api/staff/tickets', staffCookie]] as const) {
+      for (const status of ['FOO', 'OPEN,FOO']) {
+        const res = await request(app).get(path).query({ status }).set('Cookie', cookie);
+        expect(res.status, `${path} ${status}`).toBe(400);
+        expect(res.body.error).toBe('VALIDATION_ERROR');
+        expect(res.body.fields.status).toEqual(expect.any(String));
+      }
+    }
+  });
 });
