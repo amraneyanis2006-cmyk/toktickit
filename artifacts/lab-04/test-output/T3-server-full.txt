@@ -1,0 +1,307 @@
+# TokTickIT Lab 4 - final test output
+# Branch: main
+# Commit: 8cadebe037d77840811bcbe8f8f5875877f9d504 (Merge pull request #76 from amraneyanis2006-cmyk/lab4-staging)
+# Date:   2026-10-29T13:03:17Z
+# Dir:    server
+# Command: npx vitest run --reporter=verbose
+# ------------------------------------------------------------
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.10 /Users/yanisamrane/Documents/KMUTT_courses/Software_engineering/toktickit/server
+
+stderr | tests/lab-03/users-admin.api.test.ts
+SESSION_SECRET is not set - using an insecure development default. Set SESSION_SECRET in server/.env.
+
+ ✓ tests/lab-03/users-admin.api.test.ts > access control (API-28, SEC-03, AC-16) > rejects an unauthenticated request with 401 53ms
+ ✓ tests/lab-03/users-admin.api.test.ts > access control (API-28, SEC-03, AC-16) > IT Staff session gets 403 FORBIDDEN on every /api/admin/* route 449ms
+ ✓ tests/lab-03/users-admin.api.test.ts > access control (API-28, SEC-03, AC-16) > Requester session gets 403 FORBIDDEN on every /api/admin/* route 546ms
+ ✓ tests/lab-03/users-admin.api.test.ts > GET /api/admin/users (API-30, FR-17) > searches name or email case-insensitively and exposes only the list fields 551ms
+ ✓ tests/lab-03/users-admin.api.test.ts > GET /api/admin/users (API-30, FR-17) > filters by role, alone or combined with a search 537ms
+ ✓ tests/lab-03/users-admin.api.test.ts > POST /api/admin/users (API-31, API-32, FR-18, BR-19, BR-23) > creates a user: email lowercased, password generated, logged, hashed, never returned 2085ms
+ ✓ tests/lab-03/users-admin.api.test.ts > POST /api/admin/users (API-31, API-32, FR-18, BR-19, BR-23) > honours isActive:false, and that account cannot log in 1278ms
+ ✓ tests/lab-03/users-admin.api.test.ts > POST /api/admin/users (API-31, API-32, FR-18, BR-19, BR-23) > 400 VALIDATION_ERROR reports every invalid field 501ms
+ ✓ tests/lab-03/users-admin.api.test.ts > POST /api/admin/users (API-31, API-32, FR-18, BR-19, BR-23) > AC-13: 409 DUPLICATE_EMAIL, case-insensitive across roles, and no record is created 484ms
+ ✓ tests/lab-03/users-admin.api.test.ts > PATCH /api/admin/users/:id (API-33, FR-19, BR-19, BR-20) > changes only the supplied fields 1017ms
+ ✓ tests/lab-03/users-admin.api.test.ts > PATCH /api/admin/users/:id (API-33, FR-19, BR-19, BR-20) > AC-13: 409 DUPLICATE_EMAIL on edit leaves the record unchanged 1586ms
+ ✓ tests/lab-03/users-admin.api.test.ts > PATCH /api/admin/users/:id (API-33, FR-19, BR-19, BR-20) > re-submitting a user's own email in a different case is not a duplicate 856ms
+ ✓ tests/lab-03/users-admin.api.test.ts > PATCH /api/admin/users/:id (API-33, FR-19, BR-19, BR-20) > 400 on a malformed email or an invalid role 503ms
+ ✓ tests/lab-03/users-admin.api.test.ts > PATCH /api/admin/users/:id (API-33, FR-19, BR-19, BR-20) > 404 for an unknown id and for a non-numeric id 540ms
+ ✓ tests/lab-03/users-admin.api.test.ts > PATCH /api/admin/users/:id (API-33, FR-19, BR-19, BR-20) > BR-20: a role change applies to the user's EXISTING session on their next request 1468ms
+ ✓ tests/lab-03/users-admin.api.test.ts > PATCH /api/admin/users/:id/reset-password (API-34, AC-14, FR-20, BR-23) > forces a password change: old password dead, existing session gated, new password must be changed 5540ms
+ ✓ tests/lab-03/users-admin.api.test.ts > PATCH /api/admin/users/:id/reset-password (API-34, AC-14, FR-20, BR-23) > 404 for an unknown user 435ms
+ ✓ tests/lab-03/users-admin.api.test.ts > self-deactivation (API-35, AC-12, FR-21, BR-22) > 403 SELF_DEACTIVATION_FORBIDDEN even when other active Administrators exist, and the account stays active 451ms
+ ✓ tests/lab-03/users-admin.api.test.ts > deactivation keeps data (API-37, API-38, BR-01, BR-21) > a just-deactivated user cannot use their session or log in, but their tickets and comments remain visible to staff 1561ms
+ ✓ tests/lab-03/users-admin.api.test.ts > last active Administrator (API-36, AC-11, FR-22, BR-22) > 409 LAST_ADMIN_PROTECTED when the only active Administrator changes their own role 546ms
+ ✓ tests/lab-03/users-admin.api.test.ts > last active Administrator (API-36, AC-11, FR-22, BR-22) > the guard is not blanket: demoting a SECOND Administrator is allowed while another remains active 939ms
+stderr | tests/lab-03/auth.api.test.ts
+SESSION_SECRET is not set - using an insecure development default. Set SESSION_SECRET in server/.env.
+
+ ✓ tests/lab-03/auth.api.test.ts > POST /api/auth/login > AC-01, API-01: valid login returns safe user data and sets a session cookie 470ms
+ ✓ tests/lab-03/auth.api.test.ts > POST /api/auth/login > AC-05, API-02: invalid password returns a generic 401 531ms
+ ✓ tests/lab-03/auth.api.test.ts > POST /api/auth/login > AC-05, API-03: login for an inactive account returns the identical 401 as API-02 7ms
+ ✓ tests/lab-03/auth.api.test.ts > POST /api/auth/login > API-04: login for an unknown email returns the identical 401 as API-02/03 29ms
+ ✓ tests/lab-03/auth.api.test.ts > POST /api/auth/login > rejects a request missing email or password with 400 VALIDATION_ERROR 5ms
+ ✓ tests/lab-03/auth.api.test.ts > mustChangePassword gate (API-05) > blocks a protected route with 403 PASSWORD_CHANGE_REQUIRED while mustChangePassword is true 513ms
+ ✓ tests/lab-03/auth.api.test.ts > mustChangePassword gate (API-05) > does not block /api/auth/me even while mustChangePassword is true 537ms
+ ✓ tests/lab-03/auth.api.test.ts > mustChangePassword gate (API-05) > allows the protected route again after mustChangePassword becomes false 1756ms
+ ✓ tests/lab-03/auth.api.test.ts > POST /api/auth/change-password > API-06: succeeds, persists mustChangePassword=false, and the new password works on next login 2336ms
+ ✓ tests/lab-03/auth.api.test.ts > POST /api/auth/change-password > API-07: rejects a new password shorter than 8 characters 453ms
+ ✓ tests/lab-03/auth.api.test.ts > POST /api/auth/change-password > API-07: rejects a new password identical to the current password 504ms
+ ✓ tests/lab-03/auth.api.test.ts > POST /api/auth/change-password > rejects an incorrect current password with a field-level error 1009ms
+ ✓ tests/lab-03/auth.api.test.ts > POST /api/auth/logout (API-08) > AC-06: destroys the session so the old cookie is rejected afterward 466ms
+ ✓ tests/lab-03/auth.api.test.ts > POST /api/auth/logout (API-08) > is a no-op success (still 200) when already unauthenticated 3ms
+ ✓ tests/lab-03/auth.api.test.ts > GET /api/auth/me without a session > returns 401 NOT_AUTHENTICATED 2ms
+ ✓ tests/lab-03/auth.api.test.ts > Session expiry (API-09, BR-06) > treats a session past its 8h inactivity window as unauthenticated 471ms
+ ✓ tests/lab-03/auth.api.test.ts > AC-15: a real migrated Lab 2 Requester keeps exactly their pre-migration Tickets > My Tickets, authenticated as a migrated account, matches the database ground truth exactly 2615ms
+stderr | tests/lab-03/staff-ticket-detail.api.test.ts
+SESSION_SECRET is not set - using an insecure development default. Set SESSION_SECRET in server/.env.
+
+ ✓ tests/lab-03/staff-ticket-detail.api.test.ts > GET /api/staff/tickets/:ticketNumber > returns full detail including internalNotes for staff, regardless of ownership 745ms
+ ✓ tests/lab-03/staff-ticket-detail.api.test.ts > GET /api/staff/tickets/:ticketNumber > AC-16: rejects a Requester session with 403 FORBIDDEN 450ms
+ ✓ tests/lab-03/staff-ticket-detail.api.test.ts > GET /api/staff/tickets/:ticketNumber > returns 404 for a nonexistent ticket 493ms
+ ✓ tests/lab-03/staff-ticket-detail.api.test.ts > GET /api/staff/tickets/:ticketNumber > AC-10: a Requester's Public Comment is visible to Staff with the correct author and timestamp 1057ms
+ ✓ tests/lab-03/staff-ticket-detail.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/claim (AC-07, BR-11, BR-12) > claims an unassigned ticket 595ms
+ ✓ tests/lab-03/staff-ticket-detail.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/claim (AC-07, BR-11, BR-12) > reassigns an owned ticket to another active staff member 455ms
+ ✓ tests/lab-03/staff-ticket-detail.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/claim (AC-07, BR-11, BR-12) > 422 INVALID_OWNER: rejects a target that is not an active IT Staff/Administrator 398ms
+ ✓ tests/lab-03/staff-ticket-detail.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/claim (AC-07, BR-11, BR-12) > 400: rejects a missing ticketOwnerId 514ms
+ ✓ tests/lab-03/staff-ticket-detail.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/claim (AC-07, BR-11, BR-12) > 409 OWNERSHIP_CHANGED: rejects a stale expectedUpdatedAt 548ms
+ ✓ tests/lab-03/staff-ticket-detail.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/claim (AC-07, BR-11, BR-12) > succeeds when expectedUpdatedAt matches the current row 540ms
+ ✓ tests/lab-03/staff-ticket-detail.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/priority (BR-13) > sets a valid IT Priority 548ms
+ ✓ tests/lab-03/staff-ticket-detail.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/priority (BR-13) > rejects an invalid priority value 396ms
+ ✓ tests/lab-03/staff-ticket-detail.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/status (AC-08, BR-14, sec 4.7) > AC-08: rejects an illegal transition with 409 INVALID_TRANSITION, status unchanged 445ms
+ ✓ tests/lab-03/staff-ticket-detail.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/status (AC-08, BR-14, sec 4.7) > 409 UNASSIGNED_TICKET: cannot resolve an unowned ticket 603ms
+ ✓ tests/lab-03/staff-ticket-detail.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/status (AC-08, BR-14, sec 4.7) > resolving an OWNED ticket succeeds 610ms
+ ✓ tests/lab-03/staff-ticket-detail.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/status (AC-08, BR-14, sec 4.7) > transitioning into REOPENED resets requesterIndicatedResolved to false 691ms
+ ✓ tests/lab-03/staff-ticket-detail.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/status (AC-08, BR-14, sec 4.7) > a legal transition NOT into REOPENED echoes requesterIndicatedResolved unchanged 462ms
+ ✓ tests/lab-03/staff-ticket-detail.api.test.ts > POST /api/staff/tickets/:ticketNumber/notes (BR-15, BR-16, BR-27, AC-04) > creates an Internal Note with server-set author and timestamp 436ms
+ ✓ tests/lab-03/staff-ticket-detail.api.test.ts > POST /api/staff/tickets/:ticketNumber/notes (BR-15, BR-16, BR-27, AC-04) > rejects empty content 443ms
+ ✓ tests/lab-03/staff-ticket-detail.api.test.ts > POST /api/staff/tickets/:ticketNumber/notes (BR-15, BR-16, BR-27, AC-04) > AC-04: a Requester session is rejected with 403, never reaching note content 672ms
+stderr | tests/lab-03/requester-regression.api.test.ts
+SESSION_SECRET is not set - using an insecure development default. Set SESSION_SECRET in server/.env.
+
+ ✓ tests/lab-03/requester-regression.api.test.ts > MIG-04: x-requester-id header is fully removed > a request with only the old header (no session) is 401, not treated as an implicit identity 51ms
+ ✓ tests/lab-03/requester-regression.api.test.ts > POST /api/tickets (session-scoped, API-10) > AC-03: creates a ticket owned by the session user, ignoring any client-supplied requesterId 684ms
+ ✓ tests/lab-03/requester-regression.api.test.ts > POST /api/tickets (session-scoped, API-10) > rejects an IT Staff session with 403 FORBIDDEN (Requester-only route) 493ms
+ ✓ tests/lab-03/requester-regression.api.test.ts > GET /api/tickets and /api/tickets/:ticketNumber (API-12 continuity) > lists only the session user's own tickets 557ms
+ ✓ tests/lab-03/requester-regression.api.test.ts > GET /api/tickets and /api/tickets/:ticketNumber (API-12 continuity) > returns the ticket detail for its owner 414ms
+ ✓ tests/lab-03/requester-regression.api.test.ts > GET /api/tickets and /api/tickets/:ticketNumber (API-12 continuity) > AC-09: never includes internalNotes, even structurally - a Requester's own Internal Notes stay invisible 433ms
+ ✓ tests/lab-03/requester-regression.api.test.ts > GET /api/tickets and /api/tickets/:ticketNumber (API-12 continuity) > returns 404 for a different Requester (BR-26/BR-27, identical to not-found) 462ms
+ ✓ tests/lab-03/requester-regression.api.test.ts > POST /api/tickets/:ticketNumber/comments (API-13/14/15/16) > API-13: the owning Requester can post a Public Comment 538ms
+ ✓ tests/lab-03/requester-regression.api.test.ts > POST /api/tickets/:ticketNumber/comments (API-13/14/15/16) > API-14: IT Staff can post a Public Comment on any ticket (not just owned ones) 546ms
+ ✓ tests/lab-03/requester-regression.api.test.ts > POST /api/tickets/:ticketNumber/comments (API-13/14/15/16) > API-15: rejects empty/whitespace-only content 515ms
+ ✓ tests/lab-03/requester-regression.api.test.ts > POST /api/tickets/:ticketNumber/comments (API-13/14/15/16) > API-15: rejects content over 2000 characters 452ms
+ ✓ tests/lab-03/requester-regression.api.test.ts > POST /api/tickets/:ticketNumber/comments (API-13/14/15/16) > a non-owning Requester gets 404, not the comment thread (BR-26) 430ms
+ ✓ tests/lab-03/requester-regression.api.test.ts > PATCH /api/tickets/:ticketNumber/resolved-indication (API-18) > sets requesterIndicatedResolved=true without changing currentStatus 516ms
+ ✓ tests/lab-03/requester-regression.api.test.ts > PATCH /api/tickets/:ticketNumber/resolved-indication (API-18) > is idempotent (calling it again still returns true) 533ms
+ ✓ tests/lab-03/requester-regression.api.test.ts > PATCH /api/tickets/:ticketNumber/resolved-indication (API-18) > rejects a non-owner with 404 553ms
+ ✓ tests/lab-03/requester-regression.api.test.ts > PATCH /api/tickets/:ticketNumber/resolved-indication (API-18) > rejects an IT Staff session with 403 (Requester-only action) 546ms
+stderr | tests/lab-03/staff-queue.api.test.ts
+SESSION_SECRET is not set - using an insecure development default. Set SESSION_SECRET in server/.env.
+
+ ✓ tests/lab-03/staff-queue.api.test.ts > GET /api/staff/tickets (API-19, BR-18) > rejects a Requester session with 403 FORBIDDEN 638ms
+ ✓ tests/lab-03/staff-queue.api.test.ts > GET /api/staff/tickets (API-19, BR-18) > API-20/BR-17: returns tickets across all Requesters/owners for an IT Staff session 461ms
+ ✓ tests/lab-03/staff-queue.api.test.ts > GET /api/staff/tickets (API-19, BR-18) > filters by status 439ms
+ ✓ tests/lab-03/staff-queue.api.test.ts > GET /api/staff/tickets (API-19, BR-18) > filters by priority (itPriority, not requestedPriority) 548ms
+ ✓ tests/lab-03/staff-queue.api.test.ts > GET /api/staff/tickets (API-19, BR-18) > ownership=mine returns only the acting staff member's tickets 544ms
+ ✓ tests/lab-03/staff-queue.api.test.ts > GET /api/staff/tickets (API-19, BR-18) > ownership=unassigned returns only tickets with no owner 549ms
+ ✓ tests/lab-03/staff-queue.api.test.ts > GET /api/staff/tickets (API-19, BR-18) > search matches ticket number or summary, case-insensitive 500ms
+ ✓ tests/lab-03/staff-queue.api.test.ts > GET /api/staff/tickets (API-19, BR-18) > pagination metadata reflects page/pageSize/totalItems/totalPages 405ms
+ ✓ tests/lab-03/staff-queue.api.test.ts > GET /api/staff/tickets (API-19, BR-18) > AC-17: sortBy/sortDir actually change the returned order (ticketNumber asc vs desc) 468ms
+ ✓ tests/lab-03/staff-queue.api.test.ts > GET /api/staff/tickets (API-19, BR-18) > rejects an unauthenticated request with 401 4ms
+stderr | tests/lab-04/migration.api.test.ts
+SESSION_SECRET is not set - using an insecure development default. Set SESSION_SECRET in server/.env.
+
+ ✓ tests/lab-04/migration.api.test.ts > Lab 4 migration > MIG-01: the Lab 4 migration SQL is additive only and has been applied 33ms
+ ✓ tests/lab-04/migration.api.test.ts > Lab 4 migration > MIG-02: the resolvedAt backfill sets updatedAt on legacy RESOLVED/CLOSED tickets only, and re-running is a no-op 64ms
+ ✓ tests/lab-04/migration.api.test.ts > Lab 4 migration > MIG-03: Lab 1-3 data stays readable through the Lab 3 endpoints; legacy tickets have no actions or history 432ms
+ ✓ tests/lab-04/migration.api.test.ts > Lab 4 migration > MIG-04: running the seed twice leaves every seeded table count unchanged 7257ms
+stderr | tests/lab-04/ticket-workflow.api.test.ts
+SESSION_SECRET is not set - using an insecure development default. Set SESSION_SECRET in server/.env.
+
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Resolution gate on PATCH /api/staff/tickets/:ticketNumber/status > WF-01: resolving with no completed action is 409 RESOLUTION_BLOCKED [NO_COMPLETED_ACTION]; status unchanged 244ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Resolution gate on PATCH /api/staff/tickets/:ticketNumber/status > WF-02: resolving with an open action (direct API call) is 409 RESOLUTION_BLOCKED [OPEN_ACTIONS]; status unchanged 213ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Resolution gate on PATCH /api/staff/tickets/:ticketNumber/status > WF-02: an action created while a resolve is in flight is seen by the gate (no RESOLVED ticket with an open action) 87ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Resolution gate on PATCH /api/staff/tickets/:ticketNumber/status > WF-02: an action create racing a resolve that commits first is refused with TICKET_NOT_ACTIVE 154ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Resolution gate on PATCH /api/staff/tickets/:ticketNumber/status > WF-02: an owner removed while a resolve waits on the lock is 409 UNASSIGNED_TICKET (checked on the locked row) 97ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Resolution gate on PATCH /api/staff/tickets/:ticketNumber/status > WF-06: an owner removed while a close waits on the lock is 409 UNASSIGNED_TICKET; a legacy RESOLVED ticket without actions can be CLOSED 154ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Resolution gate on PATCH /api/staff/tickets/:ticketNumber/status > WF-03: resolving when the gate is met sets RESOLVED, resolvedAt, exactly one history row, and the api-spec sec 8 shape 102ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Resolution gate on PATCH /api/staff/tickets/:ticketNumber/status > WF-03: an Administrator can resolve, and WAITING_FOR_REQUESTER -> RESOLVED is gated the same way 98ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Transition matrix (BR-11) > WF-04: every pair not in the matrix (all 8x8 checked) is 409 INVALID_TRANSITION and the status is unchanged 1131ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Stale and concurrent status changes (BR-17) > WF-05: a stale expectedUpdatedAt is 409 STALE_UPDATE with the current ticket; nothing is overwritten 322ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Stale and concurrent status changes (BR-17) > WF-05: a status changed between the read and the write is 409 STALE_UPDATE (locked-row re-check) 95ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Stale and concurrent status changes (BR-17) > WF-05: on the locked row the status is re-checked before the owner (STALE_UPDATE, not UNASSIGNED_TICKET) 99ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Stale and concurrent status changes (BR-17) > WF-05: with expectedUpdatedAt, any update landing between the check and the write is 409 STALE_UPDATE 95ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Stale and concurrent status changes (BR-17) > WF-05: two parallel transitions - exactly one succeeds and exactly one history row is written 138ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16) > WF-06: CLOSED keeps resolvedAt; REOPENED clears resolvedAt and requesterIndicatedResolved; one history row per change 409ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16) > WF-07: the Requester "Problem Appears Resolved" never changes the status; staff detail shows requesterIndicatedResolved 145ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16) > WF-08: role-appropriate visibility and stable ordering of actions and status history 520ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16) > WF-09: an action edit or status change racing a ticket cancel is refused with TICKET_NOT_ACTIVE 234ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16) > WF-09: cancelling a Ticket also cancels its open Actions Taken in the same change; finished actions are untouched 795ms
+stderr | tests/lab-04/ticket-workflow.api.test.ts > Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16) > WF-09: a failure after the cascade rolls everything back - status, actions and history (BR-13, BR-16 same transaction)
+Error changing ticket status: PrismaClientUnknownRequestError: 
+Invalid `tx.ticketStatusChange.create()` invocation in
+/Users/yanisamrane/Documents/KMUTT_courses/Software_engineering/toktickit/server/src/routes/staffTickets.ts:494:58
+
+  491   });
+  492 }
+  493 
+→ 494 const statusChange = await tx.ticketStatusChange.create(
+Error occurred during query execution:
+ConnectorError(ConnectorError { user_facing_error: None, kind: QueryError(PostgresError { code: "P0001", message: "injected failure", severity: "ERROR", detail: None, column: None, hint: None }), transient: false })
+    at $n.handleRequestError (/Users/yanisamrane/Documents/KMUTT_courses/Software_engineering/toktickit/node_modules/@prisma/client/runtime/library.js:121:7505)
+    at $n.handleAndLogRequestError (/Users/yanisamrane/Documents/KMUTT_courses/Software_engineering/toktickit/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/Users/yanisamrane/Documents/KMUTT_courses/Software_engineering/toktickit/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at l (/Users/yanisamrane/Documents/KMUTT_courses/Software_engineering/toktickit/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at /Users/yanisamrane/Documents/KMUTT_courses/Software_engineering/toktickit/server/src/routes/staffTickets.ts:494:30
+    at Proxy._transactionWithCallback (/Users/yanisamrane/Documents/KMUTT_courses/Software_engineering/toktickit/node_modules/@prisma/client/runtime/library.js:130:8000)
+    at /Users/yanisamrane/Documents/KMUTT_courses/Software_engineering/toktickit/server/src/routes/staffTickets.ts:444:22 {
+  clientVersion: '5.22.0'
+}
+
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16) > WF-09: a failure after the cascade rolls everything back - status, actions and history (BR-13, BR-16 same transaction) 108ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16) > WF-09: a cancel refused on the locked row (status changed while it waited) leaves the open actions untouched 204ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16) > WF-09: a new create (fresh key or no key) blocked behind a cancel is TICKET_NOT_ACTIVE and saves nothing 194ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16) > WF-09: a retried create blocked behind a cancel that committed the original returns the replay, not TICKET_NOT_ACTIVE 205ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16) > WF-09: an open action committed while the cancel waits on the lock is cancelled by it 104ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16) > WF-09: on a RESOLVED, CLOSED or CANCELLED ticket, writes to a finished action are TICKET_NOT_ACTIVE (BR-10 before BR-09) 351ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16) > WF-09: replaying a create after the cancel returns the original action in its current (cancelled) state 199ms
+ ✓ tests/lab-04/ticket-workflow.api.test.ts > Close / reopen / cancel (BR-13, BR-14, BR-15, BR-16) > WF-09: a Ticket without actions can be CANCELLED, and CANCELLED is terminal 201ms
+ ✓ tests/lab-03/unit/password.unit.test.ts > password hashing helper (UNIT-01) > hash differs from the plaintext password 405ms
+ ✓ tests/lab-03/unit/password.unit.test.ts > password hashing helper (UNIT-01) > verifyPassword round-trips correctly 1478ms
+ ✓ tests/lab-03/unit/password.unit.test.ts > password hashing helper (UNIT-01) > produces a different hash each time (bcrypt salting) 889ms
+stderr | tests/lab-04/actions-taken.api.test.ts
+SESSION_SECRET is not set - using an insecure development default. Set SESSION_SECRET in server/.env.
+
+ ✓ tests/lab-04/actions-taken.api.test.ts > GET /api/staff/tickets/:ticketNumber/actions > API-01: lists Actions Taken ordered by actionAt asc then id asc, identically on every call 404ms
+ ✓ tests/lab-04/actions-taken.api.test.ts > POST /api/staff/tickets/:ticketNumber/actions > API-02: rejects invalid fields with 400 VALIDATION_ERROR listing every field, and saves nothing 55ms
+ ✓ tests/lab-04/actions-taken.api.test.ts > POST /api/staff/tickets/:ticketNumber/actions > API-03: creates a valid Action Taken under the correct Ticket and actor 107ms
+ ✓ tests/lab-04/actions-taken.api.test.ts > POST /api/staff/tickets/:ticketNumber/actions > API-04: rejects an inactive or Requester assignee on create and on edit with 422 INVALID_ASSIGNEE 192ms
+ ✓ tests/lab-04/actions-taken.api.test.ts > POST /api/staff/tickets/:ticketNumber/actions > API-05: requires a Follow-up Note when Follow-Up Required; stores null when not required 107ms
+ ✓ tests/lab-04/actions-taken.api.test.ts > POST /api/staff/tickets/:ticketNumber/actions > API-06: ignores client-supplied createdById and ticketId 47ms
+ ✓ tests/lab-04/actions-taken.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/actions/:actionId > API-07: edits and re-assigns an open action; only supplied fields change and updatedAt changes 100ms
+ ✓ tests/lab-04/actions-taken.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/actions/:actionId > API-08: completing requires a Result; a COMPLETED action is locked 151ms
+ ✓ tests/lab-04/actions-taken.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/actions/:actionId > API-08: completing uses an already stored Result when none is sent 99ms
+ ✓ tests/lab-04/actions-taken.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/actions/:actionId > API-09: cancelling sets CANCELLED and cancelledAt; it stays listed and cannot be edited 181ms
+ ✓ tests/lab-04/actions-taken.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/actions/:actionId > API-10: a status change on a COMPLETED or CANCELLED action is 409 ACTION_LOCKED 315ms
+ ✓ tests/lab-04/actions-taken.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/actions/:actionId > API-10: illegal moves between open states are 409 INVALID_ACTION_TRANSITION 204ms
+ ✓ tests/lab-04/actions-taken.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/actions/:actionId > API-11: a stale expectedUpdatedAt is rejected with 409 STALE_UPDATE and the current record; a missing token is 400 236ms
+ ✓ tests/lab-04/actions-taken.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/actions/:actionId > API-11: two parallel edits with the same token - exactly one wins 150ms
+ ✓ tests/lab-04/actions-taken.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/actions/:actionId > API-12: the same clientRequestId twice (sequential and parallel) creates exactly one row 302ms
+ ✓ tests/lab-04/actions-taken.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/actions/:actionId > API-12: the same clientRequestId with a different payload is 409 IDEMPOTENCY_KEY_REUSED with the original 259ms
+ ✓ tests/lab-04/actions-taken.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/actions/:actionId > API-13: refuses to create or edit Actions Taken on a RESOLVED, CLOSED, or CANCELLED Ticket 387ms
+ ✓ tests/lab-04/actions-taken.api.test.ts > PATCH /api/staff/tickets/:ticketNumber/actions/:actionId > API-14: Actions Taken are append-only - DELETE is 404 (no route) and order is stable after an edit 196ms
+ ✓ tests/lab-04/actions-taken.api.test.ts > Ticket Detail includes Actions Taken > API-01: staff and owning-Requester detail return the same ordered actionsTaken 266ms
+stderr | tests/lab-04/staff-dashboard.api.test.ts
+SESSION_SECRET is not set - using an insecure development default. Set SESSION_SECRET in server/.env.
+
+ ✓ tests/lab-04/staff-dashboard.api.test.ts > GET /api/dashboard/staff > DASH-07: every metric and every byStatus / byItPriority key equals the raw SQL count 178ms
+ ✓ tests/lab-04/staff-dashboard.api.test.ts > GET /api/dashboard/staff > DASH-08: every drill-down query returns totalItems equal to its card value 510ms
+ ✓ tests/lab-04/staff-dashboard.api.test.ts > GET /api/dashboard/staff > DASH-09: Requester 403, no session 401, IT Staff without userAccounts, Administrator with userAccounts equal to SQL 239ms
+ ✓ tests/lab-04/staff-dashboard.api.test.ts > GET /api/dashboard/staff > DASH-09: the users drill-down rejects an invalid isActive with 400 VALIDATION_ERROR (PR #71 review) 47ms
+ ✓ tests/lab-04/staff-dashboard.api.test.ts > GET /api/dashboard/staff > DASH-10: a staff member with no open actions gets myOpenActions 0 and an empty list 50ms
+ ✓ tests/lab-04/staff-dashboard.api.test.ts > GET /api/dashboard/staff > DASH-11: lists hold at most 5 items, in the documented order, with only the documented fields 41ms
+ ✓ tests/lab-04/staff-dashboard.api.test.ts > GET /api/dashboard/staff > DASH-12: awaitingReview counts active Tickets with requesterIndicatedResolved only 15ms
+stderr | tests/lab-04/performance.smoke.test.ts
+SESSION_SECRET is not set - using an insecure development default. Set SESSION_SECRET in server/.env.
+
+ ✓ tests/lab-04/performance.smoke.test.ts > Performance smoke (AC-25) > PERF-01: the Requester dashboard answers 10 calls with p95 < 500 ms 355ms
+ ✓ tests/lab-04/performance.smoke.test.ts > Performance smoke (AC-25) > PERF-02: the staff dashboard (Administrator) answers 10 calls with p95 < 500 ms 437ms
+ ✓ tests/lab-04/performance.smoke.test.ts > Performance smoke (AC-25) > PERF-03: Staff Ticket Detail with 25 Actions Taken answers in < 500 ms 175ms
+ ✓ tests/lab-04/performance.smoke.test.ts > Performance smoke (AC-25) > PERF-04: GET /api/health is unchanged and GET /api/health/db reports the database 38ms
+stderr | tests/lab-04/security.api.test.ts
+SESSION_SECRET is not set - using an insecure development default. Set SESSION_SECRET in server/.env.
+
+ ✓ tests/lab-04/security.api.test.ts > Lab 4 authorization (backend-enforced) > SEC-01: a Requester gets 403 FORBIDDEN on every Action Taken endpoint and the status endpoint; nothing changes 138ms
+ ✓ tests/lab-04/security.api.test.ts > Lab 4 authorization (backend-enforced) > SEC-02: a Requester reads Actions Taken of their own Ticket (no internalNotes) and gets 404 for another Requester's Ticket 162ms
+ ✓ tests/lab-04/security.api.test.ts > Lab 4 authorization (backend-enforced) > SEC-03: every new endpoint without a session returns 401 NOT_AUTHENTICATED 16ms
+ ✓ tests/lab-04/security.api.test.ts > Lab 4 authorization (backend-enforced) > SEC-04: a user who must change their password gets 403 PASSWORD_CHANGE_REQUIRED on every new endpoint 80ms
+ ✓ tests/lab-04/security.api.test.ts > Lab 4 authorization (backend-enforced) > SEC-05: malformed ids and payloads give 404/400, never 500, and no stack trace 391ms
+ ✓ tests/lab-04/security.api.test.ts > Lab 4 authorization (backend-enforced) > SEC-05: an unknown status filter value (single or in a list) is 400 VALIDATION_ERROR with fields.status, never 500 63ms
+stderr | tests/lab-04/requester-dashboard.api.test.ts
+SESSION_SECRET is not set - using an insecure development default. Set SESSION_SECRET in server/.env.
+
+ ✓ tests/lab-04/requester-dashboard.api.test.ts > GET /api/dashboard/requester > DASH-01: each Requester gets only their own counts and tickets; a requesterId query parameter is ignored 174ms
+ ✓ tests/lab-04/requester-dashboard.api.test.ts > GET /api/dashboard/requester > DASH-02: every metric equals the same count run with raw SQL 46ms
+ ✓ tests/lab-04/requester-dashboard.api.test.ts > GET /api/dashboard/requester > DASH-03: a Requester with no Tickets gets zeros and empty lists with 200 48ms
+ ✓ tests/lab-04/requester-dashboard.api.test.ts > GET /api/dashboard/requester > DASH-04: the 7-day window counts a resolution 6 days ago and not one 8 days ago 12ms
+ ✓ tests/lab-04/requester-dashboard.api.test.ts > GET /api/dashboard/requester > DASH-05: every drill-down query returns totalItems equal to its metric value 183ms
+ ✓ tests/lab-04/requester-dashboard.api.test.ts > GET /api/dashboard/requester > DASH-06: IT Staff and Administrators get 403; no session gets 401 65ms
+stderr | tests/lab-02/reference-data.api.test.ts
+SESSION_SECRET is not set - using an insecure development default. Set SESSION_SECRET in server/.env.
+
+ ✓ tests/lab-02/reference-data.api.test.ts > GET /api/categories > API-24: returns only active categories 103ms
+ ✓ tests/lab-02/reference-data.api.test.ts > GET /api/categories > response items only expose id and name 9ms
+ ✓ tests/lab-02/reference-data.api.test.ts > GET /api/related-systems > API-24: returns only active related systems, at least the 7 seeded 49ms
+ ✓ tests/lab-02/reference-data.api.test.ts > GET /api/related-systems > response items only expose id and name 34ms
+stderr | tests/lab-01/categories.test.ts
+SESSION_SECRET is not set - using an insecure development default. Set SESSION_SECRET in server/.env.
+
+ ✓ tests/lab-01/categories.test.ts > GET /api/categories > should return 200 OK and list of categories 79ms
+stderr | tests/lab-01/health.test.ts
+SESSION_SECRET is not set - using an insecure development default. Set SESSION_SECRET in server/.env.
+
+ ✓ tests/lab-01/health.test.ts > GET /api/health > should return 200 OK with expected JSON body 67ms
+ ✓ tests/lab-02/ticket-number.unit.test.ts > generateTicketNumber > UNIT-01: returns TKT-{YYYY}-{6 digits}, zero-padded 7ms
+ ✓ tests/lab-02/ticket-number.unit.test.ts > generateTicketNumber > UNIT-01: pads a large sequence number to exactly 6 digits 1ms
+ ✓ tests/lab-02/ticket-number.unit.test.ts > generateTicketNumber > UNIT-02: two consecutive generations never collide 2ms
+ ✓ tests/lab-03/unit/statusTransition.unit.test.ts > status transition matrix (UNIT-02) > returns true only for every listed pair (sec 4.7) 7ms
+ ✓ tests/lab-03/unit/statusTransition.unit.test.ts > status transition matrix (UNIT-02) > returns false for every unlisted pair, including all self-transitions 4ms
+ ✓ tests/lab-03/unit/statusTransition.unit.test.ts > status transition matrix (UNIT-02) > CANCELLED is terminal - no legal next status 2ms
+ ✓ tests/lab-03/unit/statusTransition.unit.test.ts > status transition matrix (UNIT-02) > legalNextStatuses matches isValidTransition for every status 6ms
+ ✓ tests/lab-02/ticket-validation.unit.test.ts > validateTicketFields (UNIT-03) > rejects a Summary under 5 characters 4ms
+ ✓ tests/lab-02/ticket-validation.unit.test.ts > validateTicketFields (UNIT-03) > rejects a Summary over 150 characters 0ms
+ ✓ tests/lab-02/ticket-validation.unit.test.ts > validateTicketFields (UNIT-03) > accepts a Summary between 5 and 150 characters 0ms
+ ✓ tests/lab-02/ticket-validation.unit.test.ts > validateTicketFields (UNIT-03) > rejects a Description under 10 characters 0ms
+ ✓ tests/lab-02/ticket-validation.unit.test.ts > validateTicketFields (UNIT-03) > rejects a Description over 2000 characters 0ms
+ ✓ tests/lab-02/ticket-validation.unit.test.ts > validateTicketFields (UNIT-03) > trims whitespace before checking length (still invalid if too short after trim) 0ms
+ ✓ tests/lab-02/ticket-validation.unit.test.ts > validateTicketFields (UNIT-03) > trims whitespace before checking length (valid if long enough after trim) 0ms
+ ✓ tests/lab-02/ticket-validation.unit.test.ts > validateTicketFields (UNIT-03) > rejects both fields at once when both are missing 0ms
+ ✓ tests/lab-02/ticket-validation.unit.test.ts > validateTicketFields (UNIT-03) > returns no errors for fully valid input 2ms
+ ✓ tests/lab-02/pagination.unit.test.ts > normalizePagination (UNIT-05) > falls back to page=1 for invalid page values 3ms
+ ✓ tests/lab-02/pagination.unit.test.ts > normalizePagination (UNIT-05) > falls back to pageSize=10 for invalid pageSize values 1ms
+ ✓ tests/lab-02/pagination.unit.test.ts > normalizePagination (UNIT-05) > passes through valid pageSize of 20 or 50 0ms
+ ✓ tests/lab-02/pagination.unit.test.ts > normalizePagination (UNIT-05) > passes through a valid page number greater than 1 0ms
+ ✓ tests/lab-02/pagination.unit.test.ts > normalizePagination (UNIT-05) > defaults to page=1, pageSize=10 when nothing is provided 1ms
+ ✓ tests/lab-03/unit/email.unit.test.ts > email normalization (UNIT-04) > lowercases the email 4ms
+ ✓ tests/lab-03/unit/email.unit.test.ts > email normalization (UNIT-04) > trims surrounding whitespace 0ms
+ ✓ tests/lab-03/unit/email.unit.test.ts > email normalization (UNIT-04) > treats differently-cased addresses as the same normalized value 0ms
+ ✓ tests/lab-02/attachment-validation.unit.test.ts > validateAttachment (UNIT-04) > accepts JPG, PNG, WEBP, PDF under 5MB 3ms
+ ✓ tests/lab-02/attachment-validation.unit.test.ts > validateAttachment (UNIT-04) > rejects an unsupported MIME type (e.g. .exe) 0ms
+ ✓ tests/lab-02/attachment-validation.unit.test.ts > validateAttachment (UNIT-04) > rejects a file over 5MB 0ms
+ ✓ tests/lab-02/attachment-validation.unit.test.ts > validateAttachment (UNIT-04) > accepts a file exactly at the 5MB boundary 0ms
+ ✓ tests/lab-02/attachment-validation.unit.test.ts > validateAttachment (UNIT-04) > rejects a file that is both wrong type AND too large (type error wins) 0ms
+ ✓ tests/lab-04/unit/actionValidation.unit.test.ts > Action Taken field validation (BR-06, BR-07) > UNIT-03: accepts a valid action and trims every text field 7ms
+ ✓ tests/lab-04/unit/actionValidation.unit.test.ts > Action Taken field validation (BR-06, BR-07) > UNIT-03: rejects an empty (whitespace-only) and a too-long description 1ms
+ ✓ tests/lab-04/unit/actionValidation.unit.test.ts > Action Taken field validation (BR-06, BR-07) > UNIT-03: requires a Follow-up Note when Follow-Up Required, and stores null otherwise 1ms
+ ✓ tests/lab-04/unit/actionValidation.unit.test.ts > Action Taken field validation (BR-06, BR-07) > UNIT-03: rejects an Action Date/Time before the Ticket creation or later than now + 5 minutes 1ms
+ ✓ tests/lab-04/unit/actionValidation.unit.test.ts > Action Taken field validation (BR-06, BR-07) > UNIT-03: rejects a missing or non ISO-8601 Action Date/Time 1ms
+ ✓ tests/lab-04/unit/actionValidation.unit.test.ts > Action Taken field validation (BR-06, BR-07) > UNIT-03: limits Result and Attachment Notes, stores empty optional text as null 1ms
+ ✓ tests/lab-04/unit/actionValidation.unit.test.ts > Action Taken field validation (BR-06, BR-07) > UNIT-03: returns every field error at once 1ms
+ ✓ tests/lab-04/unit/actionValidation.unit.test.ts > Action Taken field validation (BR-06, BR-07) > UNIT-03: rejects wrong types 1ms
+ ✓ tests/lab-04/unit/actionValidation.unit.test.ts > Action Taken field validation (BR-06, BR-07) > UNIT-03: update mode validates only supplied fields and applies the follow-up rule to the merged state 1ms
+ ✓ tests/lab-03/unit/initialPassword.unit.test.ts > initial password generator (UNIT-03) > produces a string of at least 12 characters 4ms
+ ✓ tests/lab-03/unit/initialPassword.unit.test.ts > initial password generator (UNIT-03) > is never deterministic across calls 1ms
+ ✓ tests/lab-04/unit/statusFilter.unit.test.ts > Comma-separated status filter (api-spec sec 7) > UNIT-05: parses one or many statuses and de-duplicates 6ms
+ ✓ tests/lab-04/unit/statusFilter.unit.test.ts > Comma-separated status filter (api-spec sec 7) > UNIT-05: no value means no filter 1ms
+ ✓ tests/lab-04/unit/statusFilter.unit.test.ts > Comma-separated status filter (api-spec sec 7) > UNIT-05: rejects any unknown value, single or in a list, with a fields.status error 2ms
+ ✓ tests/lab-04/unit/dashboardWindow.unit.test.ts > Dashboard constants and window (BR-22, BR-23) > UNIT-04: active statuses are exactly the five BR-22 values and open actions PLANNED/IN_PROGRESS 5ms
+ ✓ tests/lab-04/unit/dashboardWindow.unit.test.ts > Dashboard constants and window (BR-22, BR-23) > UNIT-04: the recent window starts exactly 7 x 24 h before now, independent of the time zone 4ms
+ ✓ tests/lab-04/unit/actionTransition.unit.test.ts > Action Taken status transitions (BR-08) > UNIT-01: allows exactly the BR-08 transitions and rejects every other pair 5ms
+ ✓ tests/lab-04/unit/actionTransition.unit.test.ts > Action Taken status transitions (BR-08) > UNIT-01: COMPLETED and CANCELLED are terminal (no exit) and locked 1ms
+ ✓ tests/lab-04/unit/actionTransition.unit.test.ts > Action Taken status transitions (BR-08) > UNIT-01: PLANNED and IN_PROGRESS are the open statuses 1ms
+ ✓ tests/lab-04/unit/actionTransition.unit.test.ts > Action Taken status transitions (BR-08) > UNIT-01: unknown values are never a valid transition 0ms
+ ✓ tests/lab-04/unit/resolutionGate.unit.test.ts > computeResolutionGate (BR-12) > UNIT-02: an owned ticket with a completed action and no open action can be resolved 4ms
+ ✓ tests/lab-04/unit/resolutionGate.unit.test.ts > computeResolutionGate (BR-12) > UNIT-02: UNASSIGNED applies exactly when there is no Ticket Owner 0ms
+ ✓ tests/lab-04/unit/resolutionGate.unit.test.ts > computeResolutionGate (BR-12) > UNIT-02: NO_COMPLETED_ACTION applies when no action is COMPLETED (none, or only cancelled) 0ms
+ ✓ tests/lab-04/unit/resolutionGate.unit.test.ts > computeResolutionGate (BR-12) > UNIT-02: OPEN_ACTIONS applies when any action is PLANNED or IN_PROGRESS 0ms
+ ✓ tests/lab-04/unit/resolutionGate.unit.test.ts > computeResolutionGate (BR-12) > UNIT-02: lists every blocker that applies, in a stable order 0ms
+
+ Test Files  28 passed (28)
+      Tests  220 passed (220)
+   Start at  20:03:19
+   Duration  111.03s (transform 1.08s, setup 0ms, import 8.86s, tests 92.47s, environment 8ms)
+
+# ------------------------------------------------------------
+# Exit code: 0

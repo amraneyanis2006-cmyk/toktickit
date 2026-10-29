@@ -1,0 +1,21 @@
+# TokTickIT Lab 4 - final test output
+# Branch: main
+# Commit: 8cadebe037d77840811bcbe8f8f5875877f9d504 (Merge pull request #76 from amraneyanis2006-cmyk/lab4-staging)
+# Date:   2026-10-29T13:02:30Z
+# Dir:    server
+# Command: npx vitest run tests/lab-04/unit
+# ------------------------------------------------------------
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.10 /Users/yanisamrane/Documents/KMUTT_courses/Software_engineering/toktickit/server
+
+
+ Test Files  5 passed (5)
+      Tests  23 passed (23)
+   Start at  20:02:33
+   Duration  4.17s (transform 312ms, setup 0ms, import 596ms, tests 111ms, environment 2ms)
+
+# ------------------------------------------------------------
+# Exit code: 0
