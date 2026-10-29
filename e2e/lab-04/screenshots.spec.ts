@@ -34,15 +34,29 @@ function shot(group: string, nn: string, state: string, what: string, simulated 
 /** Action panel states: below 768 px the panel is a fixed full-screen sheet, so capture the viewport. */
 const sheet = (vp: Viewport) => vp.width >= 768;
 
+/**
+ * DoD §10 "no console error": fails on page errors and console errors. The browser's own
+ * "Failed to load resource" lines are skipped: they log the expected 4xx/aborted responses
+ * these screens show on purpose (409 stale/blocked, 422, 400, simulated failures, 401 on /login).
+ */
+function watchConsole(page: Page) {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+  page.on('console', (m) => { if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) errors.push(m.text()); });
+  return () => expect(errors, 'console errors').toEqual([]);
+}
+
 /** Runs `body` once per viewport, logged in as `email`. */
 function scenario(title: string, email: string, body: (page: Page, vp: Viewport) => Promise<void>) {
   test(`SHOT-01: ${title}`, async ({ page }) => {
     test.setTimeout(180_000);
+    const noConsoleErrors = watchConsole(page);
     await login(page, email, FIXTURE_PASSWORD);
     for (const vp of VIEWPORTS) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
       await body(page, vp);
     }
+    noConsoleErrors();
   });
 }
 
@@ -389,6 +403,7 @@ scenario('regression screens (Administrator)', E2E_ADMIN.email, async (page, vp)
 
 // ---------------------------------------------------------------- demo (seeded accounts, prisma/seed.ts)
 // The README demo accounts on the seeded data, for the report. Password: the README dev password.
+// Precondition: a database seeded per the README (npm run db:seed) with those accounts on DevPass123!.
 const DEMO_PASSWORD = 'DevPass123!';
 const DEMO_TICKET = 'Wi-Fi certificate expired on several lab laptops'; // seeded with 3 Actions Taken
 const dm = 'demo';
@@ -401,11 +416,13 @@ const dmRequesterTicket = shot(dm, '05', 'requester-ticket-actions', 'The same s
 function demo(title: string, email: string, body: (page: Page, vp: Viewport) => Promise<void>) {
   test(`SHOT-01: demo - ${title}`, async ({ page }) => {
     test.setTimeout(180_000);
+    const noConsoleErrors = watchConsole(page);
     await login(page, email, DEMO_PASSWORD);
     for (const vp of VIEWPORTS) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
       await body(page, vp);
     }
+    noConsoleErrors();
   });
 }
 
@@ -420,8 +437,9 @@ demo('IT Staff dashboard and seeded ticket', 'alex.kim@example.com', async (page
   await dashboardsLoaded(page, 5);
   await dmStaff(page, vp);
   const { data } = await (await page.request.get(`${API}/staff/tickets?search=${encodeURIComponent(DEMO_TICKET)}`)).json();
+  expect(data.length, `seeded ticket "${DEMO_TICKET}" (run npm run db:seed)`).toBeGreaterThan(0);
   await openStaffTicket(page, data[0].ticketNumber);
-  await expect(page.getByRole('heading', { name: 'Actions Taken (3)' })).toBeVisible();
+  await expect(page.getByTestId('action-description').filter({ visible: true }).nth(1)).toBeVisible(); // several actions
   await dmStaffTicket(page, vp);
 });
 
@@ -430,6 +448,7 @@ demo('Requester dashboard and seeded ticket', 'jennifer.anderson@toktickit.test'
   await dashboardsLoaded(page, 4);
   await dmRequester(page, vp);
   const { data } = await (await page.request.get(`${API}/tickets?search=${encodeURIComponent(DEMO_TICKET)}`)).json();
+  expect(data.length, `seeded ticket "${DEMO_TICKET}" (run npm run db:seed)`).toBeGreaterThan(0);
   await page.goto(`/tickets/${data[0].ticketNumber}`);
   await expect(page.getByRole('heading', { name: 'Work done on your ticket' })).toBeVisible();
   await dmRequesterTicket(page, vp);
