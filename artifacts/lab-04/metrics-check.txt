@@ -1,0 +1,46 @@
+Lab 4 metrics check - 2026-10-29T03:49:28.108Z
+metric | API | SQL | match
+requester.openTickets | 1 | 1 | yes
+requester.waitingForMe | 1 | 1 | yes
+requester.resolvedLast7Days | 0 | 0 | yes
+requester.closedTickets | 0 | 0 | yes
+alex.kim.unassignedOpen | 231 | 231 | yes
+alex.kim.myOpenTickets | 6 | 6 | yes
+alex.kim.awaitingReview | 12 | 12 | yes
+alex.kim.highPriorityOpen | 17 | 17 | yes
+alex.kim.myOpenActions | 1 | 1 | yes
+alex.kim.byStatus.NEW | 235 | 235 | yes
+alex.kim.byStatus.OPEN | 3 | 3 | yes
+alex.kim.byStatus.IN_PROGRESS | 14 | 14 | yes
+alex.kim.byStatus.WAITING_FOR_REQUESTER | 4 | 4 | yes
+alex.kim.byStatus.RESOLVED | 2 | 2 | yes
+alex.kim.byStatus.CLOSED | 2 | 2 | yes
+alex.kim.byStatus.REOPENED | 2 | 2 | yes
+alex.kim.byStatus.CANCELLED | 1 | 1 | yes
+alex.kim.byItPriority.LOW | 5 | 5 | yes
+alex.kim.byItPriority.MEDIUM | 3 | 3 | yes
+alex.kim.byItPriority.HIGH | 17 | 17 | yes
+alex.kim.byItPriority.NONE | 233 | 233 | yes
+admin.unassignedOpen | 231 | 231 | yes
+admin.myOpenTickets | 0 | 0 | yes
+admin.awaitingReview | 12 | 12 | yes
+admin.highPriorityOpen | 17 | 17 | yes
+admin.myOpenActions | 0 | 0 | yes
+admin.byStatus.NEW | 235 | 235 | yes
+admin.byStatus.OPEN | 3 | 3 | yes
+admin.byStatus.IN_PROGRESS | 14 | 14 | yes
+admin.byStatus.WAITING_FOR_REQUESTER | 4 | 4 | yes
+admin.byStatus.RESOLVED | 2 | 2 | yes
+admin.byStatus.CLOSED | 2 | 2 | yes
+admin.byStatus.REOPENED | 2 | 2 | yes
+admin.byStatus.CANCELLED | 1 | 1 | yes
+admin.byItPriority.LOW | 5 | 5 | yes
+admin.byItPriority.MEDIUM | 3 | 3 | yes
+admin.byItPriority.HIGH | 17 | 17 | yes
+admin.byItPriority.NONE | 233 | 233 | yes
+admin.userAccounts.activeRequesters | 14 | 14 | yes
+admin.userAccounts.activeItStaff | 5 | 5 | yes
+admin.userAccounts.activeAdministrators | 2 | 2 | yes
+admin.userAccounts.inactive | 12 | 12 | yes
+alex.kim: no userAccounts in the response (IT Staff, BR-27)
+42 metrics, 0 mismatch(es)

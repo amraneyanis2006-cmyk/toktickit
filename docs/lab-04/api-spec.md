@@ -355,3 +355,4 @@ each with drill-down `/staff/tickets?status=<S>` or
 | Staff dashboard | ❌ 403 | ✅ | ✅ + `userAccounts` |
 | Read Internal Notes | ❌ 403 | ✅ | ✅ |
 | User management (`/api/admin/*`) | ❌ 403 | ❌ 403 | ✅ |
+| Health (`GET /api/health`, `GET /api/health/db`) | ✅ public | ✅ public | ✅ public |

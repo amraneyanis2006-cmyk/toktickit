@@ -7,6 +7,7 @@ import { isValidTransition, legalNextStatuses } from '../utils/statusTransition'
 import type { TicketStatus } from '../utils/statusTransition';
 import { TICKET_HISTORY_INCLUDE, toActionTaken, toStatusChange } from '../utils/ticketHistory';
 import { computeResolutionGate } from '../utils/resolutionGate';
+import { parseStatusFilter } from '../utils/statusFilter';
 import { parseIsoDateTime } from '../utils/actionValidation';
 import { LOCKING_TX_OPTIONS } from '../utils/transactions';
 import { OPEN_ACTION_STATUSES } from '../utils/actionTransition';
@@ -39,8 +40,17 @@ router.get(
       if (sortDir !== 'asc' && sortDir !== 'desc') sortDir = 'desc';
 
       const search = (req.query.search as string) || '';
-      const status = (req.query.status as string) || undefined;
+      // Lab 4 drill-down filters (api-spec sec 7.2): status list, priority NONE, requesterResolved.
+      const statusFilter = parseStatusFilter(req.query.status);
       const itPriority = (req.query.priority as string) || undefined; // BR-18: filters itPriority, not requestedPriority
+      const fields: Record<string, string> = {};
+      if (statusFilter.error) fields.status = statusFilter.error;
+      if (itPriority && !['LOW', 'MEDIUM', 'HIGH', 'NONE'].includes(itPriority)) {
+        fields.priority = 'priority must be LOW, MEDIUM, HIGH or NONE.';
+      }
+      if (Object.keys(fields).length > 0) {
+        return res.status(400).json({ error: 'VALIDATION_ERROR', message: Object.values(fields)[0], fields });
+      }
       const ownership = (req.query.ownership as string) || 'all';
 
       const where: any = {};
@@ -51,8 +61,9 @@ router.get(
           { summary: { contains: search, mode: 'insensitive' } },
         ];
       }
-      if (status) where.currentStatus = status;
-      if (itPriority) where.itPriority = itPriority;
+      if (statusFilter.statuses) where.currentStatus = { in: statusFilter.statuses };
+      if (itPriority) where.itPriority = itPriority === 'NONE' ? null : itPriority;
+      if (req.query.requesterResolved === 'true') where.requesterIndicatedResolved = true;
 
       if (ownership === 'mine') {
         where.ticketOwnerId = req.user!.id;
