@@ -10,7 +10,7 @@ it printed and its exit code.
 |---|---|---|---|
 | 1. Clean clone | fresh clone of `lab4-staging` at `a7342fc0` (merge of PR #74) | `toktickit_lab4_check` (empty) | install, generate, migrate, seed ×2 (second run creates 0 tickets; table counts unchanged by a third run), server 220/220, client 106/106, Playwright 140/140 |
 | 2. Lab 3 → Lab 4 migration | fresh clone of `main` at `0291eedd` (Lab 3 release) to build the Lab 3 database, then the Part 1 clone to migrate it | `toktickit_lab3_copy` | every pre-existing Lab 1–3 row unchanged (row fingerprints), `resolvedAt` backfilled for RESOLVED/CLOSED only, legacy tickets with 0 actions; `scripts/lab4-rollback.sql` removes every Lab 4 object and leaves Lab 1–3 rows unchanged; `migrate deploy` re-applies cleanly |
-| 3. Release candidate | `feature/67-release-integration` at `dabd3a65` | `toktickit_lab4_check` (fresh, migrated and seeded) | metrics check on seeded data 42/0 mismatches, screenshots 21/21 (no console error), Playwright 143/143 |
+| 3. Release candidate | `feature/67-release-integration`, the tree committed as `36ee99b6`/`dabd3a65` (spec and script code identical in both) | `toktickit_lab4_check` (fresh, migrated and seeded) | metrics check on seeded data 42/0 mismatches, screenshots 21/21 (console-error check active in 20 of the 21 tests; the login-screen test has none), Playwright 143/143 |
 
 ## Part 1: clean clone
 
@@ -83,6 +83,8 @@ $ npm run test:e2e -- --workers=2
       140 passed (7.5m)
     -> exit 0
 
+$ dropdb toktickit_lab4_check   (end of Part 1; Part 3 recreates it)
+    -> exit 0
 ```
 
 ## Part 2: migration of a Lab 3 database, rollback, re-migration
