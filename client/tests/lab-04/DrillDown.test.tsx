@@ -89,6 +89,15 @@ describe('Drill-down filters (UI-05)', () => {
     expect(window.location.search).toBe('');
   });
 
+  it('UI-05: the chip disappears as soon as the filters no longer match the dashboard link (PR #73 review)', async () => {
+    render(<MemoryRouter initialEntries={['/staff/tickets?ownership=mine&status=OPEN']}><StaffTicketQueue /></MemoryRouter>);
+    await waitFor(() => expect(lastQuery('/staff/tickets').get('ownership')).toBe('mine'));
+    expect(chip()).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText('Filter by status'), '');
+    expect(chip()).not.toBeInTheDocument();
+    expect(lastQuery('/staff/tickets').get('ownership')).toBe('mine');
+  });
+
   it('UI-05: without dashboard parameters there is no chip', async () => {
     render(<MemoryRouter initialEntries={['/staff/tickets']}><StaffTicketQueue /></MemoryRouter>);
     await waitFor(() => expect(apiFetch).toHaveBeenCalled());

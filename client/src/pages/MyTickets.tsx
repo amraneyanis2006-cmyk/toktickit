@@ -55,7 +55,11 @@ export default function MyTickets() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [status, setStatus] = useState(() => searchParams.get('status') ?? '');
   const [resolvedWithinDays, setResolvedWithinDays] = useState(() => searchParams.get('resolvedWithinDays') ?? '');
-  const [fromDashboard, setFromDashboard] = useState(() => searchParams.has('status') || searchParams.has('resolvedWithinDays'));
+  // The chip shows while the filters still equal the dashboard link (PR #73 review).
+  const filterKey = JSON.stringify([search, category, priority, status, resolvedWithinDays]);
+  const [dashboardKey, setDashboardKey] = useState(() =>
+    searchParams.has('status') || searchParams.has('resolvedWithinDays') ? filterKey : null);
+  const fromDashboard = dashboardKey === filterKey;
   const [sortBy, setSortBy] = useState<SortField>('createdAt');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
@@ -126,7 +130,7 @@ export default function MyTickets() {
     setPriority('');
     setStatus('');
     setResolvedWithinDays('');
-    setFromDashboard(false);
+    setDashboardKey(null);
     setSearchParams({}, { replace: true });
     setPage(1);
   };

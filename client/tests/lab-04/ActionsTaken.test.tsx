@@ -96,6 +96,37 @@ describe('ActionsTaken (UI-03)', () => {
     expect(ids[0]).toBe(ids[1]);
   });
 
+  it('UI-03: editing keeps the original seconds of actionAt when the minute is unchanged (PR #72 review)', async () => {
+    renderList([action({ actionAt: '2026-10-28T03:00:42.000Z' })]);
+    await userEvent.click(within(desktopTable()).getByRole('button', { name: /view/i }));
+    await userEvent.type(screen.getByLabelText(/action description/i), ' Again.');
+    await userEvent.click(screen.getByRole('button', { name: /save changes/i }));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledTimes(1));
+    expect(JSON.parse((apiFetch as any).mock.calls[0][1].body).actionAt).toBe('2026-10-28T03:00:42.000Z');
+  });
+
+  it('UI-03: on the mobile sheet Tab and Shift+Tab stay inside the panel, Esc closes it and focus returns to the opener (PR #72 review)', async () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((q: string) => ({ matches: q.includes('max-width'), media: q, addEventListener() {}, removeEventListener() {} })) as any;
+    try {
+      renderList([action()]);
+      const opener = within(desktopTable()).getByRole('button', { name: /view/i });
+      await userEvent.click(opener);
+      const panel = screen.getByRole('region', { name: /action details/i });
+      await userEvent.tab({ shift: true });
+      expect(panel).toContainElement(document.activeElement as HTMLElement);
+      for (let i = 0; i < 15; i++) {
+        await userEvent.tab();
+        expect(panel).toContainElement(document.activeElement as HTMLElement);
+      }
+      await userEvent.keyboard('{Escape}');
+      expect(screen.queryByRole('region', { name: /action details/i })).not.toBeInTheDocument();
+      expect(opener).toHaveFocus();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
   it('UI-03: Complete asks for a Result before calling the API', async () => {
     renderList([action({ status: 'IN_PROGRESS' })]);
     await userEvent.click(within(desktopTable()).getByRole('button', { name: /view/i }));

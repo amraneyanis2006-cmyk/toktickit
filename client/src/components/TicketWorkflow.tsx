@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiFetch, ApiError } from '../api/apiClient';
 import { legalNextStatuses } from '../utils/statusTransition';
 import type { TicketStatus } from '../utils/statusTransition';
@@ -32,6 +32,16 @@ export default function TicketWorkflow({ ticket, onChanged }: { ticket: Workflow
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [retryable, setRetryable] = useState(false);
+  // After a cancel the select is disabled, so focus goes to the status message (ui-spec sec 9).
+  const focusMessage = useRef(false);
+  const messageRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (focusMessage.current && success && !confirmCancel) {
+      focusMessage.current = false;
+      messageRef.current?.focus();
+    }
+  }, [success, confirmCancel]);
 
   // Older responses (Lab 3 mocks) carry no legalNextStatuses/gate: fall back to the shared matrix.
   const targets = ticket.legalNextStatuses ?? legalNextStatuses(ticket.currentStatus);
@@ -46,18 +56,23 @@ export default function TicketWorkflow({ ticket, onChanged }: { ticket: Workflow
     setBusy(true);
     setError('');
     setSuccess('');
+    setRetryable(false);
     try {
       // ponytail: CANCELLED keeps the Lab 3 body (its Lab 3 test asserts it exactly); the server's
       // locked-row status re-check still rejects a concurrent change. Add the token once that test may change.
       const body = target === 'CANCELLED' ? { currentStatus: target } : { currentStatus: target, expectedUpdatedAt: ticket.updatedAt };
       await apiFetch(`/staff/tickets/${ticket.ticketNumber}/status`, { method: 'PATCH', body: JSON.stringify(body) });
       setChoice('');
+      focusMessage.current = target === 'CANCELLED';
       setSuccess(`Status changed to ${title(target)}.`);
       await onChanged();
     } catch (err) {
       const code = err instanceof ApiError ? err.code : '';
       setError(err instanceof ApiError ? err.message : 'Unable to update status.');
-      setChoice(''); // so the same target can be picked again to retry
+      // Network/server failure: keep the choice and offer Retry; a 409 means the ticket changed, so reset and reload.
+      const transient = !(err instanceof ApiError) || err.status === 0 || err.status >= 500;
+      setRetryable(transient);
+      if (!transient) setChoice('');
       if (['RESOLUTION_BLOCKED', 'INVALID_TRANSITION', 'STALE_UPDATE', 'UNASSIGNED_TICKET'].includes(code)) await onChanged();
     } finally {
       setBusy(false);
@@ -84,8 +99,13 @@ export default function TicketWorkflow({ ticket, onChanged }: { ticket: Workflow
         ))}
       </select>
       {resolveBlocked && <div id="resolve-reason" className="small text-muted mt-1">{reason}</div>}
-      {error && <div className="zg-callout-error p-2 mt-2 small" role="alert">{error}</div>}
-      {success && <div className="zg-callout-info p-2 mt-2 small" role="status">{success}</div>}
+      {error && (
+        <div className="zg-callout-error p-2 mt-2 small d-flex flex-wrap align-items-center gap-2" role="alert">
+          {error}
+          {retryable && choice && <button type="button" className="btn btn-sm btn-zg-secondary" onClick={() => select(choice)}>Retry</button>}
+        </div>
+      )}
+      {success && <div ref={messageRef} tabIndex={-1} className="zg-callout-info p-2 mt-2 small" role="status">{success}</div>}
 
       {confirmCancel && (
         <ConfirmDialog title="Cancel this ticket? This cannot be undone." confirmLabel="Yes, cancel ticket" busy={busy}

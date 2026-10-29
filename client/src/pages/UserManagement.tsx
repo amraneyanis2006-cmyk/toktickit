@@ -383,7 +383,10 @@ export default function UserManagement() {
   const [searchParams] = useState(() => new URLSearchParams(window.location.search));
   const [roleFilter, setRoleFilter] = useState(() => searchParams.get('role') ?? '');
   const [activeFilter, setActiveFilter] = useState(() => searchParams.get('isActive') ?? '');
-  const [fromDashboard, setFromDashboard] = useState(() => searchParams.has('role') || searchParams.has('isActive'));
+  // The chip shows while the filters still equal the dashboard link (PR #73 review).
+  const filterKey = JSON.stringify([search, roleFilter, activeFilter]);
+  const [dashboardKey, setDashboardKey] = useState(() => (searchParams.has('role') || searchParams.has('isActive') ? filterKey : null));
+  const fromDashboard = dashboardKey === filterKey;
   const [activeAdminCount, setActiveAdminCount] = useState<number | null>(null);
   const [panel, setPanel] = useState<PanelState>(null);
   const [notice, setNotice] = useState('');
@@ -431,7 +434,7 @@ export default function UserManagement() {
     setSearch('');
     setRoleFilter('');
     setActiveFilter('');
-    setFromDashboard(false);
+    setDashboardKey(null);
     window.history.replaceState(window.history.state, '', window.location.pathname);
   };
 
