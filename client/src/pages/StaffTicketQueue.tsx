@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiFetch } from '../api/apiClient';
+import { DashboardChip } from '../components/DashboardParts';
+import { statusTitle } from '../utils/statusTransition';
 
 interface TicketRow {
   id: number;
@@ -39,10 +41,21 @@ function StatusBadge({ value }: { value: string }) {
 export default function StaffTicketQueue() {
   const navigate = useNavigate();
 
+  // Lab 4 drill-down (ui-spec sec 5): a dashboard card opens the queue with its filter in the URL.
+  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
-  const [priority, setPriority] = useState('');
-  const [ownership, setOwnership] = useState<'all' | 'mine' | 'unassigned'>('all');
+  const [status, setStatus] = useState(() => searchParams.get('status') ?? '');
+  const [priority, setPriority] = useState(() => searchParams.get('priority') ?? '');
+  const [ownership, setOwnership] = useState<'all' | 'mine' | 'unassigned'>(() => {
+    const o = searchParams.get('ownership');
+    return o === 'mine' || o === 'unassigned' ? o : 'all';
+  });
+  const [requesterResolved, setRequesterResolved] = useState(() => searchParams.get('requesterResolved') === 'true');
+  // The chip shows while the filters still equal the dashboard link (PR #73 review).
+  const filterKey = JSON.stringify([search, status, priority, ownership, requesterResolved]);
+  const [dashboardKey, setDashboardKey] = useState(() =>
+    ['status', 'priority', 'ownership', 'requesterResolved'].some((k) => searchParams.has(k)) ? filterKey : null);
+  const fromDashboard = dashboardKey === filterKey;
   const [sortBy, setSortBy] = useState<SortField>('createdAt');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
@@ -53,7 +66,7 @@ export default function StaffTicketQueue() {
   const [hasEverHadTickets, setHasEverHadTickets] = useState<boolean | null>(null);
   const latestRequestId = useRef(0);
 
-  const filtersActive = Boolean(search || status || priority || ownership !== 'all');
+  const filtersActive = Boolean(search || status || priority || ownership !== 'all' || requesterResolved);
 
   const loadQueue = useCallback(async () => {
     const requestId = ++latestRequestId.current;
@@ -64,6 +77,7 @@ export default function StaffTicketQueue() {
       if (status) params.set('status', status);
       if (priority) params.set('priority', priority);
       if (ownership !== 'all') params.set('ownership', ownership);
+      if (requesterResolved) params.set('requesterResolved', 'true');
       params.set('sortBy', sortBy);
       params.set('sortDir', sortDir);
       params.set('page', String(page));
@@ -83,7 +97,7 @@ export default function StaffTicketQueue() {
       if (requestId === latestRequestId.current) setFetchState('error');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, status, priority, ownership, sortBy, sortDir, page, pageSize]);
+  }, [search, status, priority, ownership, requesterResolved, sortBy, sortDir, page, pageSize]);
 
   useEffect(() => {
     loadQueue();
@@ -104,6 +118,9 @@ export default function StaffTicketQueue() {
     setStatus('');
     setPriority('');
     setOwnership('all');
+    setRequesterResolved(false);
+    setDashboardKey(null);
+    setSearchParams({}, { replace: true });
     setPage(1);
   };
 
@@ -128,6 +145,8 @@ export default function StaffTicketQueue() {
         )}
       </div>
 
+      {fromDashboard && <DashboardChip onRemove={clearFilters} />}
+
       <div className="row g-2 mb-4">
         <div className="col-12 col-md-4">
           <input
@@ -144,6 +163,7 @@ export default function StaffTicketQueue() {
         <div className="col-6 col-md-3">
           <select
             className="form-select"
+            aria-label="Filter by status"
             value={status}
             onChange={(e) => {
               setStatus(e.target.value);
@@ -151,6 +171,7 @@ export default function StaffTicketQueue() {
             }}
           >
             <option value="">All Statuses</option>
+            {status.includes(',') && <option value={status}>{status.split(',').map(statusTitle).join(', ')}</option>}
             {STATUSES.map((s) => (
               <option key={s} value={s}>
                 {s.replace(/_/g, ' ')}
@@ -161,6 +182,7 @@ export default function StaffTicketQueue() {
         <div className="col-6 col-md-2">
           <select
             className="form-select"
+            aria-label="Filter by priority"
             value={priority}
             onChange={(e) => {
               setPriority(e.target.value);
@@ -173,6 +195,7 @@ export default function StaffTicketQueue() {
                 {p}
               </option>
             ))}
+            <option value="NONE">Not set</option>
           </select>
         </div>
         <div className="col-6 col-md-3">
@@ -188,6 +211,11 @@ export default function StaffTicketQueue() {
             <option value="mine">Mine</option>
             <option value="unassigned">Unassigned</option>
           </select>
+        </div>
+        <div className="col-12 form-check ms-1">
+          <input id="requesterResolved" type="checkbox" className="form-check-input" checked={requesterResolved}
+            onChange={(e) => { setRequesterResolved(e.target.checked); setPage(1); }} />
+          <label htmlFor="requesterResolved" className="form-check-label small">Requester says resolved</label>
         </div>
       </div>
 
@@ -288,7 +316,7 @@ export default function StaffTicketQueue() {
               Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, result.pagination.totalItems)} of{' '}
               {result.pagination.totalItems} tickets
             </span>
-            <div className="d-flex align-items-center gap-2">
+            <div className="d-flex flex-wrap align-items-center gap-2">
               <select
                 className="form-select form-select-sm w-auto"
                 value={pageSize}

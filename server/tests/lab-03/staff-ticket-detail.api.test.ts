@@ -48,6 +48,21 @@ beforeEach(async () => {
     },
   });
   ticketId = ticket.id;
+  // CHG-02 (Lab 4 spec sec 11.7): the resolution gate needs recorded work, so the
+  // shared fixture ticket (used by the resolving tests) carries one COMPLETED
+  // Action Taken. Assertions are unchanged.
+  await prisma.actionTaken.create({
+    data: {
+      ticketId,
+      actionAt: new Date(),
+      description: 'CHG-02 fixture: completed work so the ticket can be resolved.',
+      result: 'Fixture result.',
+      status: 'COMPLETED',
+      performedById: staffAId,
+      createdById: staffAId,
+      completedAt: new Date(),
+    },
+  });
 });
 
 beforeAll(async () => {
@@ -74,6 +89,10 @@ beforeAll(async () => {
 afterAll(async () => {
   await prisma.ticketInternalNote.deleteMany({ where: { authorId: { in: [staffAId, staffBId] } } });
   await prisma.ticketComment.deleteMany({ where: { authorId: requesterId } });
+  // CHG-02 teardown: the fixture actions and the Status History rows the Lab 4
+  // status endpoint now writes reference these tickets (FK), so remove them first.
+  await prisma.actionTaken.deleteMany({ where: { ticket: { ticketNumber: { startsWith: 'TKT-STO18-' } } } });
+  await prisma.ticketStatusChange.deleteMany({ where: { ticket: { ticketNumber: { startsWith: 'TKT-STO18-' } } } });
   await prisma.ticket.deleteMany({ where: { ticketNumber: { startsWith: 'TKT-STO18-' } } });
   await prisma.category.delete({ where: { id: categoryId } });
   await prisma.relatedSystem.delete({ where: { id: relatedSystemId } });

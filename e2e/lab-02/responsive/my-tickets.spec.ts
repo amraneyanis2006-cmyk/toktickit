@@ -6,6 +6,7 @@ test.describe('RESP-01: My Tickets responsive at mobile width', () => {
   test('renders as stacked cards, no horizontal scrollbar at 375px', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
+    await page.goto('/tickets'); // CHG-01: login now lands on /dashboard
 
     // The desktop table must be hidden, and the mobile card layout visible.
     await expect(page.locator('.table-responsive.d-none.d-md-block')).toBeHidden();

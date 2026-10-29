@@ -8,6 +8,7 @@ test.describe('E2E-02: Cross-Requester isolation', () => {
 
     // Create a ticket as Requester A.
     await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
+    await page.goto('/tickets'); // CHG-01: login now lands on /dashboard
     await page.getByRole('link', { name: '+ Create Ticket' }).click();
     await page.waitForURL('**/tickets/new');
     await page.waitForSelector('#category');
@@ -25,6 +26,7 @@ test.describe('E2E-02: Cross-Requester isolation', () => {
 
     // Switch to Requester B (a different dev requester).
     await login(page, E2E_REQUESTER_B.email, FIXTURE_PASSWORD);
+    await page.goto('/tickets'); // CHG-01: login now lands on /dashboard
 
     // 1. Not visible in Requester B's My Tickets list.
     await page.waitForSelector('h1:has-text("My Tickets")');

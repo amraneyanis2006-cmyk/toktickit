@@ -20,3 +20,9 @@ const TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
 export function legalNextStatuses(from: TicketStatus): TicketStatus[] {
   return TRANSITIONS[from] ?? [];
 }
+
+/** "IN_PROGRESS" -> "In progress" (drill-down chips and multi-status options). */
+export const statusTitle = (s: string) => s.replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
+
+/** Statuses counted as active by the dashboards (api-spec sec 9-10). */
+export const ACTIVE_STATUSES = 'NEW,OPEN,IN_PROGRESS,WAITING_FOR_REQUESTER,REOPENED';

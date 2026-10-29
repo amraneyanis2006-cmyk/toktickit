@@ -4,6 +4,9 @@ import { PrismaClient } from '@prisma/client';
 import { requireAuth, requirePasswordChanged, requireRole } from '../middleware/auth';
 import { generateTicketNumber } from '../utils/ticketNumber';
 import { validateTicketFields, normalizePagination, validateCommentContent } from '../utils/validation';
+import { TICKET_HISTORY_INCLUDE, toActionTaken, toStatusChange } from '../utils/ticketHistory';
+import { parseStatusFilter } from '../utils/statusFilter';
+import { recentWindowStart } from '../utils/dashboard';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -147,7 +150,18 @@ router.get('/tickets', requireAuth, requirePasswordChanged, requireRole('REQUEST
     const search = req.query.search as string || '';
     const categoryId = req.query.category ? Number(req.query.category) : undefined;
     const priority = req.query.priority as string || undefined;
-    const status = req.query.status as string || undefined;
+    // Lab 4 drill-down filters (api-spec sec 7.1): status list, resolvedWithinDays.
+    const statusFilter = parseStatusFilter(req.query.status);
+    const rawDays = req.query.resolvedWithinDays;
+    const resolvedWithinDays = rawDays === undefined ? undefined : Number(rawDays);
+    const fields: Record<string, string> = {};
+    if (statusFilter.error) fields.status = statusFilter.error;
+    if (resolvedWithinDays !== undefined && !(Number.isInteger(resolvedWithinDays) && resolvedWithinDays >= 1 && resolvedWithinDays <= 365)) {
+      fields.resolvedWithinDays = 'resolvedWithinDays must be an integer from 1 to 365.';
+    }
+    if (Object.keys(fields).length > 0) {
+      return res.status(400).json({ error: 'VALIDATION_ERROR', message: Object.values(fields)[0], fields });
+    }
 
     // CONSTRUCTION DE LA REQUÊTE
     const where: any = { requesterId };
@@ -161,7 +175,8 @@ router.get('/tickets', requireAuth, requirePasswordChanged, requireRole('REQUEST
 
     if (categoryId) where.categoryId = categoryId;
     if (priority) where.requestedPriority = priority;
-    if (status) where.currentStatus = status;
+    if (statusFilter.statuses) where.currentStatus = { in: statusFilter.statuses };
+    if (resolvedWithinDays) where.resolvedAt = { gte: recentWindowStart(new Date(), resolvedWithinDays) };
 
     // EXÉCUTION
     const [tickets, totalItems] = await Promise.all([
@@ -239,6 +254,9 @@ router.get('/tickets/:ticketNumber', requireAuth, requirePasswordChanged, requir
           orderBy: { createdAt: 'asc' },
           include: { author: { select: { id: true, name: true, role: true } } },
         },
+        // Lab 4 BR-20: a Requester reads Actions Taken and Status History of
+        // their own Ticket (never Internal Notes - not included at all).
+        ...TICKET_HISTORY_INCLUDE,
       },
     });
 
@@ -263,6 +281,7 @@ router.get('/tickets/:ticketNumber', requireAuth, requirePasswordChanged, requir
       itPriority: ticket.itPriority,
       currentStatus: ticket.currentStatus,
       requesterIndicatedResolved: ticket.requesterIndicatedResolved,
+      resolvedAt: ticket.resolvedAt,
       createdAt: ticket.createdAt,
       updatedAt: ticket.updatedAt,
       attachments: ticket.attachments.map(a => ({
@@ -286,6 +305,8 @@ router.get('/tickets/:ticketNumber', requireAuth, requirePasswordChanged, requir
         content: c.content,
         createdAt: c.createdAt,
       })),
+      actionsTaken: ticket.actionsTaken.map(toActionTaken),
+      statusHistory: ticket.statusChanges.map(toStatusChange),
     });
 
   } catch (error) {

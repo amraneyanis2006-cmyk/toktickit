@@ -6,6 +6,7 @@ test.describe('E2E-04: My Tickets search, filter, and pagination', () => {
   test('search narrows results, filter narrows results, pagination navigates pages', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
+    await page.goto('/tickets'); // CHG-01: login now lands on /dashboard
 
     // Unique suffix so re-running this test doesn't collide with tickets
     // left over from a previous run (no cleanup step exists yet).

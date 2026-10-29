@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { DashboardChip } from '../components/DashboardParts';
 import type { FormEvent, KeyboardEvent } from 'react';
 import { apiFetch, ApiError } from '../api/apiClient';
 import { useAuth } from '../context/AuthContext';
@@ -376,12 +377,21 @@ export default function UserManagement() {
   const [fetchState, setFetchState] = useState<FetchState>('loading');
   const latestRequestId = useRef(0);
   const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
+  // Lab 4 drill-down (ui-spec sec 5): the User Accounts card opens this list with role/isActive in the URL.
+  // ponytail: reads window.location, not useSearchParams, because a Lab 3 test renders this page
+  // without a Router; switch to useSearchParams once that test may change.
+  const [searchParams] = useState(() => new URLSearchParams(window.location.search));
+  const [roleFilter, setRoleFilter] = useState(() => searchParams.get('role') ?? '');
+  const [activeFilter, setActiveFilter] = useState(() => searchParams.get('isActive') ?? '');
+  // The chip shows while the filters still equal the dashboard link (PR #73 review).
+  const filterKey = JSON.stringify([search, roleFilter, activeFilter]);
+  const [dashboardKey, setDashboardKey] = useState(() => (searchParams.has('role') || searchParams.has('isActive') ? filterKey : null));
+  const fromDashboard = dashboardKey === filterKey;
   const [activeAdminCount, setActiveAdminCount] = useState<number | null>(null);
   const [panel, setPanel] = useState<PanelState>(null);
   const [notice, setNotice] = useState('');
 
-  const filtersActive = Boolean(search.trim() || roleFilter);
+  const filtersActive = Boolean(search.trim() || roleFilter || activeFilter);
 
   const loadUsers = useCallback(async () => {
     const requestId = ++latestRequestId.current;
@@ -390,6 +400,7 @@ export default function UserManagement() {
       const params = new URLSearchParams();
       if (search.trim()) params.set('search', search.trim());
       if (roleFilter) params.set('role', roleFilter);
+      if (activeFilter) params.set('isActive', activeFilter);
       const qs = params.toString();
       const data = await apiFetch<UserRow[]>(`/admin/users${qs ? `?${qs}` : ''}`);
       if (requestId !== latestRequestId.current) return; // a newer request has already superseded this one
@@ -398,7 +409,7 @@ export default function UserManagement() {
     } catch {
       if (requestId === latestRequestId.current) setFetchState('error');
     }
-  }, [search, roleFilter]);
+  }, [search, roleFilter, activeFilter]);
 
   // Separate, UNFILTERED request: the "last active Administrator" lock must not depend on
   // the current search/role filter. UX only - the server enforces BR-22 regardless.
@@ -422,6 +433,9 @@ export default function UserManagement() {
   const clearFilters = () => {
     setSearch('');
     setRoleFilter('');
+    setActiveFilter('');
+    setDashboardKey(null);
+    window.history.replaceState(window.history.state, '', window.location.pathname);
   };
 
   const handleSaved = (message: string) => {
@@ -454,8 +468,10 @@ export default function UserManagement() {
         </div>
       )}
 
+      {fromDashboard && <DashboardChip onRemove={clearFilters} />}
+
       <div className="row g-2 mb-4">
-        <div className="col-12 col-md-6">
+        <div className="col-12 col-md-4">
           <input
             type="search"
             className="form-control"
@@ -465,7 +481,7 @@ export default function UserManagement() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="col-8 col-md-4">
+        <div className="col-6 col-md-3">
           <select
             className="form-select"
             aria-label="Filter by role"
@@ -480,7 +496,14 @@ export default function UserManagement() {
             ))}
           </select>
         </div>
-        <div className="col-4 col-md-2">
+        <div className="col-6 col-md-3">
+          <select className="form-select" aria-label="Filter by account status" value={activeFilter} onChange={(e) => setActiveFilter(e.target.value)}>
+            <option value="">All Accounts</option>
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </select>
+        </div>
+        <div className="col-12 col-md-2">
           {filtersActive && (
             <button type="button" className="btn btn-zg-tertiary w-100" onClick={clearFilters}>
               Clear
@@ -561,15 +584,15 @@ export default function UserManagement() {
           <div className="d-md-none d-flex flex-column gap-3">
             {users.map((u) => (
               <div key={u.id} className="zg-card p-3">
-                <div className="d-flex justify-content-between align-items-start mb-2">
-                  <div>
-                    <div className="fw-semibold">
+                <div className="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <div style={{ minWidth: 0 }}>
+                    <div className="fw-semibold text-break">
                       {u.name}
                       {u.id === me?.id && <span className="text-muted small"> (you)</span>}
                     </div>
-                    <div className="text-muted small">{u.email}</div>
+                    <div className="text-muted small text-break">{u.email}</div>
                   </div>
-                  <div className="d-flex gap-1 flex-wrap justify-content-end">
+                  <div className="d-flex gap-1 flex-wrap justify-content-end flex-shrink-0">
                     <RoleBadge role={u.role} />
                     <ActiveBadge isActive={u.isActive} />
                   </div>

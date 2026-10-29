@@ -8,6 +8,7 @@ test.describe('E2E-04: IT Staff full ticket workflow', () => {
     // this test's mutations (claim/status) can never interfere with another
     // test (e.g. RESP-01's queue screenshot) that might run concurrently.
     await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
+    await page.goto('/tickets'); // CHG-01: login now lands on /dashboard
     await page.getByRole('link', { name: '+ Create Ticket' }).click();
     await page.waitForURL('**/tickets/new');
     await page.waitForSelector('#category');
@@ -22,6 +23,7 @@ test.describe('E2E-04: IT Staff full ticket workflow', () => {
 
     // Queue -> open.
     await login(page, E2E_STAFF_A.email, FIXTURE_PASSWORD);
+    await page.goto('/staff/tickets'); // CHG-01: login now lands on /dashboard
     await page.waitForURL('**/staff/tickets');
     await page.getByPlaceholder('Search by ticket number or summary...').fill(ticketNumber);
     await page.waitForSelector('tbody tr');
@@ -71,6 +73,7 @@ test.describe('AC-18, RESP-01: Staff Ticket Queue at <768px', () => {
   test('renders as cards, no horizontal scrollbar, at mobile width', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await login(page, E2E_STAFF_B.email, FIXTURE_PASSWORD);
+    await page.goto('/staff/tickets'); // CHG-01: login now lands on /dashboard
     await page.waitForURL('**/staff/tickets');
 
     await expect(page.locator('.table-responsive.d-none.d-lg-block')).toBeHidden();

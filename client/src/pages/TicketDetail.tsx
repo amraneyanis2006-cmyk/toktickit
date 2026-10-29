@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { apiFetch, ApiError } from '../api/apiClient';
+import ActionsTaken from '../components/ActionsTaken';
+import type { ActionTaken } from '../components/ActionsTaken';
+import { StatusHistory } from '../components/TicketWorkflow';
 
 interface Attachment {
   id: number;
@@ -36,6 +39,9 @@ interface TicketDetailResponse {
   updatedAt: string;
   attachments: Attachment[];
   publicComments: Comment[];
+  // Lab 4 (api-spec sec 2), read-only for the Requester.
+  actionsTaken?: ActionTaken[];
+  statusHistory?: Array<{ id: number; fromStatus: string; toStatus: string; changedBy: { id: number; name: string }; changedAt: string }>;
 }
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
@@ -86,23 +92,22 @@ export default function TicketDetail() {
   const [commentError, setCommentError] = useState('');
 
   const [markingResolved, setMarkingResolved] = useState(false);
-  const loadTicket = async () => {
-    setFetchState('loading');
-    try {
-      const data = await apiFetch<TicketDetailResponse>(`/tickets/${ticketNumber}`);
+  // State is only set in the promise callbacks, so the load effect below never sets state synchronously.
+  const fetchTicket = () => apiFetch<TicketDetailResponse>(`/tickets/${ticketNumber}`).then(
+    (data) => {
       setTicket(data);
       setFetchState('success');
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 404) {
-        setFetchState('not-found');
-      } else {
-        setFetchState('error');
-      }
-    }
+    },
+    (err) => setFetchState(err instanceof ApiError && err.status === 404 ? 'not-found' : 'error'),
+  );
+
+  const loadTicket = async () => {
+    setFetchState('loading');
+    await fetchTicket();
   };
 
   useEffect(() => {
-    loadTicket();
+    fetchTicket();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketNumber]);
 
@@ -322,6 +327,11 @@ export default function TicketDetail() {
           {ticket.description}
         </div>
       </div>
+
+      <hr className="my-4" />
+
+      <ActionsTaken ticketNumber={ticket.ticketNumber} actions={ticket.actionsTaken ?? []} readOnly />
+      <StatusHistory history={ticket.statusHistory} />
 
       <hr className="my-4" />
 

@@ -6,6 +6,7 @@ test.describe('E2E-01: Full responsive ticket creation flow', () => {
   test('creates a ticket end-to-end at desktop width', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
+    await page.goto('/tickets'); // CHG-01: login now lands on /dashboard
 
     await page.getByRole('link', { name: '+ Create Ticket' }).click();
     await page.waitForURL('**/tickets/new');
@@ -36,6 +37,7 @@ test.describe('E2E-01: Full responsive ticket creation flow', () => {
   test('creates a ticket end-to-end at mobile width', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
+    await page.goto('/tickets'); // CHG-01: login now lands on /dashboard
 
     await page.getByRole('link', { name: '+ Create Ticket' }).click();
     await page.waitForURL('**/tickets/new');

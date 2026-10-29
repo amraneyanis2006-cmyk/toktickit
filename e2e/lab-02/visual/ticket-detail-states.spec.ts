@@ -14,6 +14,7 @@ test.describe('Ticket Detail screenshot states (desktop)', () => {
 
   test('loaded state', async ({ page }) => {
     await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
+    await page.goto('/tickets'); // CHG-01: login now lands on /dashboard
     await page.waitForSelector('tbody tr');
     await page.locator('tbody tr').first().click();
     await page.waitForURL('**/tickets/TKT-*');
@@ -25,6 +26,7 @@ test.describe('Ticket Detail screenshot states (desktop)', () => {
 
   test('attachment-added state', async ({ page }) => {
     await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
+    await page.goto('/tickets'); // CHG-01: login now lands on /dashboard
     await page.waitForSelector('tbody tr');
     await page.locator('tbody tr').first().click();
     await page.waitForURL('**/tickets/TKT-*');
@@ -45,6 +47,7 @@ test.describe('Ticket Detail screenshot states (desktop)', () => {
     page.on('dialog', (dialog) => dialog.accept('Screenshot test removal reason.'));
 
     await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
+    await page.goto('/tickets'); // CHG-01: login now lands on /dashboard
     await page.waitForSelector('tbody tr');
     await page.locator('tbody tr').first().click();
     await page.waitForURL('**/tickets/TKT-*');
@@ -69,6 +72,7 @@ test.describe('Ticket Detail screenshot states (mobile)', () => {
   test('mobile state', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
+    await page.goto('/tickets'); // CHG-01: login now lands on /dashboard
     await page.waitForSelector('.d-md-none .zg-card.p-3');
     await page.locator('.d-md-none .zg-card.p-3').first().click();
     await page.waitForURL('**/tickets/TKT-*');

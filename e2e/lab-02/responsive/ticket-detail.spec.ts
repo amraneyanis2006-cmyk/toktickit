@@ -11,6 +11,7 @@ test.describe('RESP-03: Ticket Detail responsive at 375px', () => {
   test('attachment rows stay usable, action buttons are tappable (>=44px)', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
+    await page.goto('/tickets'); // CHG-01: login now lands on /dashboard
 
     const firstCard = page.locator('.d-md-none .zg-card.p-3').first();
     await firstCard.waitFor({ state: 'visible' });

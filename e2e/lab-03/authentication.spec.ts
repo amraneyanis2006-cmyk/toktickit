@@ -12,6 +12,7 @@ import {
 test.describe('E2E-01: Login -> browse -> logout -> blocked access', () => {
   test('full session lifecycle: browse while authenticated, then logout blocks direct URL access', async ({ page }) => {
     await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
+    await page.goto('/tickets'); // CHG-01: login now lands on /dashboard
     await expect(page).toHaveURL(/\/tickets$/);
     await page.waitForSelector('tbody tr');
 
@@ -56,7 +57,7 @@ test.describe('AC-02, E2E-02: Initial password login and change', () => {
     await page.getByRole('button', { name: 'Save New Password' }).click();
 
     // Normal app opens now - lands on the Requester's own home, not stuck on /change-password.
-    await page.waitForURL('**/tickets');
+    await page.waitForURL('**/dashboard'); // CHG-01
     await page.goto('/tickets');
     await expect(page).toHaveURL(/\/tickets$/);
   });
@@ -65,6 +66,7 @@ test.describe('AC-02, E2E-02: Initial password login and change', () => {
 test.describe('E2E-03: Requester ticket lifecycle + comment + resolved indication', () => {
   test('create a ticket, post a Public Comment, mark it resolved-indicated', async ({ page }) => {
     await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
+    await page.goto('/tickets'); // CHG-01: login now lands on /dashboard
 
     await page.getByRole('link', { name: '+ Create Ticket' }).click();
     await page.waitForURL('**/tickets/new');
@@ -152,7 +154,7 @@ test.describe('A11Y-01: Login/Change Password keyboard and focus', () => {
     await page.keyboard.type(FIXTURE_PASSWORD);
 
     await page.keyboard.press('Enter');
-    await page.waitForURL('**/tickets');
+    await page.waitForURL('**/dashboard'); // CHG-01
   });
 
   test('the focused email field shows a visible focus outline', async ({ page }) => {

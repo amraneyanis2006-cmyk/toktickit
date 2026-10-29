@@ -6,6 +6,7 @@ test.describe('VIS-02: Badge consistency across screens', () => {
   test('Priority and Status badges render identically in My Tickets and Ticket Detail', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await login(page, E2E_REQUESTER_A.email, FIXTURE_PASSWORD);
+    await page.goto('/tickets'); // CHG-01: login now lands on /dashboard
 
     await page.waitForSelector('tbody tr');
     const firstRow = page.locator('tbody tr').first();

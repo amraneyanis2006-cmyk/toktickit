@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { apiFetch } from '../api/apiClient';
+import { DashboardChip } from '../components/DashboardParts';
+import { statusTitle } from '../utils/statusTransition';
 
 interface RefItem {
   id: number;
@@ -49,7 +51,15 @@ export default function MyTickets() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
   const [priority, setPriority] = useState('');
-  const [status, setStatus] = useState('');
+  // Lab 4 drill-down (ui-spec sec 5): a dashboard card opens this list with its filter in the URL.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [status, setStatus] = useState(() => searchParams.get('status') ?? '');
+  const [resolvedWithinDays, setResolvedWithinDays] = useState(() => searchParams.get('resolvedWithinDays') ?? '');
+  // The chip shows while the filters still equal the dashboard link (PR #73 review).
+  const filterKey = JSON.stringify([search, category, priority, status, resolvedWithinDays]);
+  const [dashboardKey, setDashboardKey] = useState(() =>
+    searchParams.has('status') || searchParams.has('resolvedWithinDays') ? filterKey : null);
+  const fromDashboard = dashboardKey === filterKey;
   const [sortBy, setSortBy] = useState<SortField>('createdAt');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
@@ -60,7 +70,7 @@ export default function MyTickets() {
   const [hasEverHadTickets, setHasEverHadTickets] = useState<boolean | null>(null);
   const latestRequestId = useRef(0);
 
-  const filtersActive = Boolean(search || category || priority || status);
+  const filtersActive = Boolean(search || category || priority || status || resolvedWithinDays);
 
   const loadTickets = useCallback(async () => {
     const requestId = ++latestRequestId.current;
@@ -71,6 +81,7 @@ export default function MyTickets() {
       if (category) params.set('category', category);
       if (priority) params.set('priority', priority);
       if (status) params.set('status', status);
+      if (resolvedWithinDays) params.set('resolvedWithinDays', resolvedWithinDays);
       params.set('sortBy', sortBy);
       params.set('sortDir', sortDir);
       params.set('page', String(page));
@@ -93,7 +104,7 @@ export default function MyTickets() {
       if (requestId === latestRequestId.current) setFetchState('error');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, category, priority, status, sortBy, sortDir, page, pageSize]);
+  }, [search, category, priority, status, resolvedWithinDays, sortBy, sortDir, page, pageSize]);
 
   useEffect(() => {
     apiFetch<RefItem[]>('/categories').then(setCategories).catch(() => {});
@@ -118,6 +129,9 @@ export default function MyTickets() {
     setCategory('');
     setPriority('');
     setStatus('');
+    setResolvedWithinDays('');
+    setDashboardKey(null);
+    setSearchParams({}, { replace: true });
     setPage(1);
   };
 
@@ -145,6 +159,8 @@ export default function MyTickets() {
           </Link>
         </div>
       </div>
+
+      {fromDashboard && <DashboardChip onRemove={clearFilters} />}
 
       {/* Toolbar */}
       <div className="row g-2 mb-4">
@@ -197,6 +213,7 @@ export default function MyTickets() {
         <div className="col-6 col-md-2">
           <select
             className="form-select"
+            aria-label="Filter by status"
             value={status}
             onChange={(e) => {
               setStatus(e.target.value);
@@ -204,6 +221,7 @@ export default function MyTickets() {
             }}
           >
             <option value="">All Statuses</option>
+            {status.includes(',') && <option value={status}>{status.split(',').map(statusTitle).join(', ')}</option>}
             {STATUSES.map((s) => (
               <option key={s} value={s}>
                 {s.replace(/_/g, ' ')}
@@ -211,6 +229,13 @@ export default function MyTickets() {
             ))}
           </select>
         </div>
+        {searchParams.get('resolvedWithinDays') && (
+          <div className="col-12 form-check ms-1">
+            <input id="resolvedWithin" type="checkbox" className="form-check-input" checked={Boolean(resolvedWithinDays)}
+              onChange={(e) => { setResolvedWithinDays(e.target.checked ? searchParams.get('resolvedWithinDays')! : ''); setPage(1); }} />
+            <label htmlFor="resolvedWithin" className="form-check-label small">Resolved in the last {searchParams.get('resolvedWithinDays')} days</label>
+          </div>
+        )}
       </div>
 
       {fetchState === 'error' && (
@@ -316,7 +341,7 @@ export default function MyTickets() {
               {Math.min(page * pageSize, result.pagination.totalItems)} of{' '}
               {result.pagination.totalItems} tickets
             </span>
-            <div className="d-flex align-items-center gap-2">
+            <div className="d-flex flex-wrap align-items-center gap-2">
               <select
                 className="form-select form-select-sm w-auto"
                 value={pageSize}
