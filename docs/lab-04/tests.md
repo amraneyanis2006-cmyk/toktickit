@@ -147,7 +147,8 @@ Planned before implementation (Spec DD → Test DD → TDD). Every AC in
 Administrator, calls both dashboard endpoints, runs the equivalent raw SQL for every
 metric, and prints a table `metric | API | SQL | match`; output saved to
 `artifacts/lab-04/metrics-check.txt` (Answer Part 5). It logs in with `LAB4_CHECK_PASSWORD` from the environment, falling back to
-the README dev seed password (`DevPass123!`, local only).
+the README dev seed password (`DevPass123!`, local only); `LAB4_CHECK_REQUESTER` selects the
+Requester (default: the seeded `jennifer.anderson@toktickit.test`).
 
 ## 12. Acceptance-Criterion Traceability
 

@@ -273,7 +273,7 @@ Open `http://localhost:5173` and log in. Seeded credentials (**local development
 | IT Staff | `alex.kim@example.com` | `DevPass123!` |
 | Administrator | `admin@example.com` | `DevPass123!` |
 
-`npm run lab4:metrics-check` logs in with these accounts; set `LAB4_CHECK_PASSWORD` if your seed uses another password (the fallback is `DevPass123!`).
+`npm run lab4:metrics-check` logs in with these accounts; set `LAB4_CHECK_PASSWORD` if your seed uses another password (the fallback is `DevPass123!`) and `LAB4_CHECK_REQUESTER` to use another Requester.
 
 ## Running Tests (Lab 3)
 
@@ -335,7 +335,7 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/lab4-rollback.sql
 npm run lab4:metrics-check > artifacts/lab-04/metrics-check.txt   # exits 1 on any mismatch
 ```
 
-It logs in with the seeded accounts below (`LAB4_CHECK_PASSWORD` overrides the password).
+It logs in with the seeded accounts below. `LAB4_CHECK_PASSWORD` overrides the password, and `LAB4_CHECK_REQUESTER` overrides the Requester (default `jennifer.anderson@toktickit.test`).
 
 ### Tests
 
