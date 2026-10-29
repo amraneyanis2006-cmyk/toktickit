@@ -49,7 +49,8 @@ export const L4 = {
   shotStale: 'TKT-L4E-000202', // screenshots: stale update (one PLANNED action)
   shotComplete: 'TKT-L4E-000203', // screenshots: complete + cancel dialog
   shotResolve: 'TKT-L4E-000204', // screenshots: RESOLUTION_BLOCKED, then resolve
-  shotCancel: 'TKT-L4E-000205', // screenshots: ticket cancel dialog with an open action
+  // screenshots: ticket cancel with an open action, one per viewport (a cancel cannot be undone)
+  shotCancel: { 'desktop-1280': 'TKT-L4E-000205', 'tablet-768': 'TKT-L4E-000206', 'mobile-320': 'TKT-L4E-000207' },
 } as const;
 
 async function upsertFixtureUser(params: { name: string; email: string; role: Role; isActive?: boolean }) {
@@ -145,8 +146,10 @@ async function setupLab4(categoryId: number, relatedSystemId: number, staffAId: 
   const shotComplete = await ticket(L4.shotComplete, 'E2E L4: Screenshot complete and cancel');
   await action(shotComplete.id, 6, ActionStatus.IN_PROGRESS, 'Reinstall the VPN client');
   await action(shotComplete.id, 5, ActionStatus.PLANNED, 'Schedule a follow-up call');
-  const shotCancel = await ticket(L4.shotCancel, 'E2E L4: Screenshot ticket cancel');
-  await action(shotCancel.id, 5, ActionStatus.PLANNED, 'Wait for the replacement part');
+  for (const ticketNumber of Object.values(L4.shotCancel)) {
+    const t = await ticket(ticketNumber, 'E2E L4: Screenshot ticket cancel');
+    await action(t.id, 5, ActionStatus.PLANNED, 'Wait for the replacement part');
+  }
 }
 
 export default async function globalSetup() {
