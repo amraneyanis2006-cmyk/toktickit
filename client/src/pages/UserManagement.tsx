@@ -584,15 +584,15 @@ export default function UserManagement() {
           <div className="d-md-none d-flex flex-column gap-3">
             {users.map((u) => (
               <div key={u.id} className="zg-card p-3">
-                <div className="d-flex justify-content-between align-items-start mb-2">
-                  <div>
-                    <div className="fw-semibold">
+                <div className="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <div style={{ minWidth: 0 }}>
+                    <div className="fw-semibold text-break">
                       {u.name}
                       {u.id === me?.id && <span className="text-muted small"> (you)</span>}
                     </div>
-                    <div className="text-muted small">{u.email}</div>
+                    <div className="text-muted small text-break">{u.email}</div>
                   </div>
-                  <div className="d-flex gap-1 flex-wrap justify-content-end">
+                  <div className="d-flex gap-1 flex-wrap justify-content-end flex-shrink-0">
                     <RoleBadge role={u.role} />
                     <ActiveBadge isActive={u.isActive} />
                   </div>

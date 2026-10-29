@@ -96,17 +96,18 @@ export default function StaffTicketDetail() {
   const [postingNote, setPostingNote] = useState(false);
   const [noteError, setNoteError] = useState('');
 
-  const loadTicket = async () => {
-    try {
-      const data = await apiFetch<StaffTicketDetailResponse>(`/staff/tickets/${ticketNumber}`);
+  // State is only set in the promise callbacks, so the load effect below never sets state synchronously.
+  const loadTicket = () => apiFetch<StaffTicketDetailResponse>(`/staff/tickets/${ticketNumber}`).then(
+    (data) => {
       setTicket(data);
       setFetchState('success');
-    } catch (err) {
+    },
+    (err) => {
       if (err instanceof ApiError && err.status === 404) setFetchState('not-found');
       else if (err instanceof ApiError && err.status === 403) setFetchState('forbidden');
       else setFetchState('error');
-    }
-  };
+    },
+  );
 
   useEffect(() => {
     loadTicket();

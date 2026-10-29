@@ -316,7 +316,7 @@ export default function StaffTicketQueue() {
               Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, result.pagination.totalItems)} of{' '}
               {result.pagination.totalItems} tickets
             </span>
-            <div className="d-flex align-items-center gap-2">
+            <div className="d-flex flex-wrap align-items-center gap-2">
               <select
                 className="form-select form-select-sm w-auto"
                 value={pageSize}
