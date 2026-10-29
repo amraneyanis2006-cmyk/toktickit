@@ -16,7 +16,7 @@ export default function ChangePassword() {
   const [bannerError, setBannerError] = useState('');
 
   if (user && !user.mustChangePassword) {
-    return <Navigate to="/tickets" replace />;
+    return <Navigate to="/" replace />;
   }
 
   const handleSubmit = async (e: FormEvent) => {
