@@ -17,4 +17,8 @@ cross-checking `specification.md`, `api-spec.md`, `ui-spec.md`, `tests.md`) and 
 
 ## My Reflection
 
-<!-- Written at the end of the sprint. -->
+I used Claude (Anthropic) in two clearly separated roles. As a **specification agent**, it read the Lab 4 handout together with my real Lab 3 code and drafted the Sprint 4 contract (specification, API, UI and test plan) before any implementation; as a **coding agent** (Claude Code), it implemented one Issue per feature branch, test-first, against that contract. Writing the contract first was the decision that paid off most: every later prompt could simply say "implement Issue #n following docs/lab-04", and the test IDs in `tests.md` made it possible to prove at the end that all 25 acceptance criteria were covered by real, passing tests.
+
+What I learned is that the agent is fast but not self-limiting, so most of my work was steering and checking. It found real problems on its own (a focus bug only visible in a real browser, test data polluting the dev database, a Lab 3 test that was too slow under load), but it also over-iterated, running nine self-review rounds on one PR, until I capped it at two and asked for minimal changes. My partner's reviews caught things neither the agent nor I had seen, such as a seed number format that broke our own Lab 2 rule and an idempotency case that could silently lose an edit. I also made process mistakes, merging #69 on a written "Approved" comment and #72 before its review, and fixed the process afterwards by making the agent check for a formal GitHub approval before every merge.
+
+My conclusion is that an AI agent can deliver a sprint of this size in a fraction of the time, and I expect this way of working to become standard. The value I added was in the decisions: the contract, the scope, which review findings to accept, and refusing to call anything done without evidence from a clean run.
