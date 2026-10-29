@@ -346,7 +346,9 @@ npm run test:e2e -- --workers=2                           # all Playwright specs
 npx playwright test e2e/lab-04/screenshots.spec.ts --workers=1   # SHOT-01: artifacts/lab-04/screenshots/ + INDEX.md
 ```
 
-Playwright resets its own fixtures on every run (`e2e/global-setup.ts`). The Lab 4 ones use the `TKT-L4E-` ticket numbers and the `e2e-*-l4`, `e2e-requester-empty`, `e2e-staff-idle` and `e2e-staff-leaving*` accounts. The Lab 2/3 fixtures are unchanged.
+The screenshots spec also has a `demo` group that logs in with the seeded accounts below (it needs a database seeded per this README). Playwright resets its own fixtures on every run (`e2e/global-setup.ts`). The Lab 4 ones use the `TKT-L4E-` ticket numbers and the `e2e-*-l4`, `e2e-requester-empty`, `e2e-staff-idle` and `e2e-staff-leaving*` accounts. The Lab 2/3 fixtures are unchanged.
+
+The clean-clone check of this release (fresh clone, throwaway database, migrate, seed twice, every suite) is logged in [`artifacts/lab-04/clean-clone-check.md`](artifacts/lab-04/clean-clone-check.md).
 
 ### Demo script (seeded accounts, password `DevPass123!`, local only)
 1. **IT Staff**: log in as `alex.kim@example.com`. You land on the Dashboard.
