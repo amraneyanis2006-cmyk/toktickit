@@ -203,18 +203,20 @@ The client Vitest config (`client/vite.config.ts`) sets `testTimeout: 15000` and
 
 ## 14. Final Results
 
-Release-candidate run on a **clean clone** of `lab4-staging` at commit `a7342fc0`
-(merge of PR #74), against a throwaway database created with `migrate deploy` and
-`db:seed` run twice. Run on 2026-10-29. Full command log:
-[`artifacts/lab-04/clean-clone-check.md`](../../artifacts/lab-04/clean-clone-check.md).
+Release-candidate runs on 2026-10-29, each on a throwaway database (full command log:
+[`artifacts/lab-04/clean-clone-check.md`](../../artifacts/lab-04/clean-clone-check.md)).
+`feature/67-release-integration` changes no server, client, Prisma or script code, so the
+server and client runs on the clean clone of `lab4-staging` cover it.
 
-| Suite | Command | Result |
-|---|---|---|
-| Server (Labs 1–4) | `cd server && npx vitest run` | 28 files, **220 passed**, 0 failed, 0 skipped |
-| Client (Labs 2–4) | `cd client && npx vitest run` | 17 files, **106 passed**, 0 failed, 0 skipped |
-| Playwright (Labs 2–4) | `npm run test:e2e -- --workers=2` | **140 passed**, 0 failed, 0 skipped |
-| Screenshots (SHOT-01, incl. the seeded demo group) | `npx playwright test e2e/lab-04/screenshots.spec.ts --workers=1` (from `feature/67-release-integration`, which adds only the demo group to that spec; same app code, freshly seeded throwaway database) | **21 passed**, 129 PNGs listed in `artifacts/lab-04/screenshots/INDEX.md` |
-| Metrics check (AC-16 evidence) | `npm run lab4:metrics-check` | 42 metrics, **0 mismatches** (`artifacts/lab-04/metrics-check.txt`) |
+| Suite | Command | Code | Result |
+|---|---|---|---|
+| Server (Labs 1–4) | `cd server && npx vitest run` | clean clone of `lab4-staging` at `a7342fc0` | 28 files, **220 passed**, 0 failed, 0 skipped |
+| Client (Labs 2–4) | `cd client && npx vitest run` | clean clone at `a7342fc0` | 17 files, **106 passed**, 0 failed, 0 skipped |
+| Playwright (Labs 2–4) | `npm run test:e2e -- --workers=2` | clean clone at `a7342fc0` | **140 passed**, 0 failed, 0 skipped |
+| Playwright (Labs 2–4, with the SHOT-01 demo group) | `npm run test:e2e -- --workers=2` | `feature/67-release-integration` at `dabd3a65` | **143 passed**, 0 failed, 0 skipped |
+| Screenshots (SHOT-01) | `npx playwright test e2e/lab-04/screenshots.spec.ts --workers=1` | `dabd3a65`, freshly seeded database | **21 passed**, no console error; 129 PNGs listed in `artifacts/lab-04/screenshots/INDEX.md` |
+| Metrics check (AC-16 evidence) | `npm run lab4:metrics-check` | `dabd3a65`, freshly seeded database (seed data only) | 42 metrics, **0 mismatches** (`artifacts/lab-04/metrics-check.txt`) |
+| Lab 3 → Lab 4 migration (AC-20) | `migrate deploy` + `db:seed` ×2 on a Lab 3 database built from `main` at `0291eedd`, then `scripts/lab4-rollback.sql` and `migrate deploy` again | clean clone at `a7342fc0` | every pre-existing Lab 1–3 row unchanged, `resolvedAt` backfilled, rollback and re-migration clean |
 
 Every Test ID above has a test whose name starts with that ID at the listed path, and
 every AC-01…AC-25 maps to at least one of them (§12). The per-suite output of the

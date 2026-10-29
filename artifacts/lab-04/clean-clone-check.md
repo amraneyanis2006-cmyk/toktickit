@@ -1,12 +1,18 @@
-# Lab 4 clean-clone check (Issue #67, DoD §10)
+# Lab 4 release checks (Issue #67, DoD §10)
 
-- **Date:** 2026-10-29T09:41Z
-- **Code:** `lab4-staging` at `a7342fc0` (merge of PR #74), cloned into an empty folder.
-- **Database:** a throwaway PostgreSQL database `toktickit_lab4_check`, created for this check and dropped at the end. The developer's `toktickit_db` and `.env` files were not touched: the clone got its own `.env` files from `.env.example`.
-- **Result:** every step exited 0. Seed idempotent (second run created 0 tickets, table counts unchanged by a third run). Server 220/220, client 106/106, Playwright 140/140, 0 failed, 0 skipped.
-- **Step c:** the e2e run leaves test data, so the database was recreated fresh (migrate + seed) before the report screenshots and the metrics check.
+Run on 2026-10-29. Every database below was a throwaway PostgreSQL database, created for
+the check and dropped at the end. The developer's `toktickit_db` and `.env` files were
+not touched: clones got their own `.env` from `.env.example`, and other commands
+exported `DATABASE_URL` for that shell only. Each command is followed by the last lines
+it printed and its exit code.
 
-Each command below is followed by the last lines it printed and its exit code.
+| Part | Code | Database | Result |
+|---|---|---|---|
+| 1. Clean clone | fresh clone of `lab4-staging` at `a7342fc0` (merge of PR #74) | `toktickit_lab4_check` (empty) | install, generate, migrate, seed ×2 (second run creates 0 tickets; table counts unchanged by a third run), server 220/220, client 106/106, Playwright 140/140 |
+| 2. Lab 3 → Lab 4 migration | fresh clone of `main` at `0291eedd` (Lab 3 release) to build the Lab 3 database, then the Part 1 clone to migrate it | `toktickit_lab3_copy` | every pre-existing Lab 1–3 row unchanged (row fingerprints), `resolvedAt` backfilled for RESOLVED/CLOSED only, legacy tickets with 0 actions; `scripts/lab4-rollback.sql` removes every Lab 4 object and leaves Lab 1–3 rows unchanged; `migrate deploy` re-applies cleanly |
+| 3. Release candidate | `feature/67-release-integration` at `dabd3a65` | `toktickit_lab4_check` (fresh, migrated and seeded) | metrics check on seeded data 42/0 mismatches, screenshots 21/21 (no console error), Playwright 143/143 |
+
+## Part 1: clean clone
 
 ```text
 $ git clone -q --branch lab4-staging <repo> clone
@@ -77,27 +83,103 @@ $ npm run test:e2e -- --workers=2
       140 passed (7.5m)
     -> exit 0
 
-## Step c: fresh throwaway database for the report screenshots (the e2e run above left test data)
-$ dropdb toktickit_lab4_check
+```
+
+## Part 2: migration of a Lab 3 database, rollback, re-migration
+
+```text
+$ git clone -q --branch main <repo> main-clone
     -> exit 0
-$ createdb toktickit_lab4_check
+$ npm install --no-audit --no-fund
+    added 220 packages in 19s
+    -> exit 0
+$ npx prisma generate
+    Prisma schema loaded from prisma/schema.prisma
+    ✔ Generated Prisma Client (v5.22.0) to ./node_modules/@prisma/client in 449ms
+    -> exit 0
+$ createdb toktickit_lab3_copy
     -> exit 0
 $ npm run db:migrate
-        └─ migration.sql
-          
+    Applying migration `20260915000002_lab3_password_not_null`
+    The following migration(s) have been applied:
+    migrations/
     All migrations have been successfully applied.
     -> exit 0
 $ npm run db:seed
-    │    npm i --save-dev prisma@latest                       │
-    │    npm i @prisma/client@latest                          │
-    └─────────────────────────────────────────────────────────┘
+      IT Staff:   4 (1 inactive)
+      Admin:      1 (admin@example.com)
+      All seeded accounts use password: DevPass123! (local dev only)
+    🌱  The seed command has been executed.
     -> exit 0
-$ npm run dev  (background, DATABASE_URL -> toktickit_lab4_check)
-$ npx playwright test e2e/lab-04/screenshots.spec.ts --workers=1
-      21 passed (2.7m)
+    fingerprint before Lab 4 (rows, md5 of Lab 3 columns): {'Attachment': '0 d41d8cd98f00b204e9800998ecf8427e', 'Category': '4 c4edd2a649446554af4eb1b5d0fade31', 'RelatedSystem': '7 31a8b87568d9f942feaca6b0363a0bbd', 'Ticket': '8 d8bb26c8943a22738543147b692a0ef2', 'TicketComment': '5 9d708fae126d744e8a4dc61a4a123fa5', 'TicketInternalNote': '5 6bea269051150207cb2de2f519308317', 'TicketSequence': '1 21202c1563d0c2ce9104b69f0c97e0c3', 'User': '10 336c742a59b879e16f157a8605b23648'}
+# Lab 4 clone (lab4-staging a7342fc0) on the Lab 3 copy
+$ npm run db:migrate
+    Applying migration `20261028000001_lab4_actions_taken`
+    The following migration(s) have been applied:
+    migrations/
+    All migrations have been successfully applied.
     -> exit 0
-$ npm run --silent lab4:metrics-check > artifacts/lab-04/metrics-check.txt   (default accounts, no LAB4_CHECK_REQUESTER)
+$ npm run db:seed
+      Admin:      1 (admin@example.com)
+      Lab 4:      6 tickets (6 created this run), 9 Actions Taken; nina.patel@toktickit.test has no ticket
+      All seeded accounts use password: DevPass123! (local dev only)
+    🌱  The seed command has been executed.
+    -> exit 0
+$ npm run db:seed
+      Admin:      1 (admin@example.com)
+      Lab 4:      6 tickets (0 created this run), 9 Actions Taken; nina.patel@toktickit.test has no ticket
+      All seeded accounts use password: DevPass123! (local dev only)
+    🌱  The seed command has been executed.
+    -> exit 0
+    fingerprint after migrate + seed x2: every Lab 1-3 table UNCHANGED for the pre-existing rows (TicketSequence advanced by the Lab 4 seed tickets); resolvedAt backfilled for the RESOLVED and CLOSED legacy tickets only; legacy tickets have 0 Actions Taken
+# Rollback (scripts/lab4-rollback.sql) on the same copy
+$ pg_dump -d toktickit_lab3_copy --format=custom --file=<scratch>/before-rollback.dump
+    -> exit 0
+$ psql -d toktickit_lab3_copy -v ON_ERROR_STOP=1 -f <repo>/scripts/lab4-rollback.sql
+    DROP INDEX
+    ALTER TABLE
+    DELETE 1
+    COMMIT
+    -> exit 0
+    check after rollback: ActionTaken and TicketStatusChange dropped = t, Ticket.resolvedAt columns = 0, Lab 4 migration rows = 0
+    fingerprint after rollback: every Lab 1-3 table UNCHANGED for the pre-existing rows (TicketSequence advanced by the Lab 4 seed)
+$ npm run db:migrate
+    Applying migration `20261028000001_lab4_actions_taken`
+    The following migration(s) have been applied:
+    migrations/
+    All migrations have been successfully applied.
+    -> exit 0
+    after re-running npm run db:migrate: ActionTaken exists = t
+$ dropdb toktickit_lab3_copy
+    -> exit 0
+```
+
+## Part 3: release candidate on a fresh database
+
+```text
+$ createdb toktickit_lab4_check
+    -> exit 0
+$ npm run db:migrate
+    Applying migration `20261028000001_lab4_actions_taken`
+    The following migration(s) have been applied:
+    migrations/
+    All migrations have been successfully applied.
+    -> exit 0
+$ npm run db:seed
+      Admin:      1 (admin@example.com)
+      Lab 4:      6 tickets (6 created this run), 9 Actions Taken; nina.patel@toktickit.test has no ticket
+      All seeded accounts use password: DevPass123! (local dev only)
+    🌱  The seed command has been executed.
+    -> exit 0
+$ npm run --silent lab4:metrics-check > artifacts/lab-04/metrics-check.txt   (seeded data only, default accounts)
     42 metrics, 0 mismatch(es)
+    -> exit 0
+$ npm run dev   (background, DATABASE_URL -> toktickit_lab4_check)
+$ npx playwright test e2e/lab-04/screenshots.spec.ts --workers=1
+      21 passed (3.7m)
+    -> exit 0
+$ npm run test:e2e -- --workers=2   (feature/67-release-integration at dabd3a65)
+      143 passed (10.2m)
     -> exit 0
 $ dropdb toktickit_lab4_check
     -> exit 0
