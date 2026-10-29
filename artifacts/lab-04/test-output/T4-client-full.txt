@@ -1,0 +1,124 @@
+# TokTickIT Lab 4 - final test output
+# Branch: main
+# Commit: 8cadebe037d77840811bcbe8f8f5875877f9d504 (Merge pull request #76 from amraneyanis2006-cmyk/lab4-staging)
+# Date:   2026-10-29T13:05:10Z
+# Dir:    client
+# Command: npx vitest run --reporter=verbose
+# ------------------------------------------------------------
+
+ RUN  v4.1.10 /Users/yanisamrane/Documents/KMUTT_courses/Software_engineering/toktickit/client
+
+ ✓ tests/lab-02/CreateTicket.test.tsx > CreateTicket > UI-04: submit without Summary shows a field-level error and does not call the API 776ms
+ ✓ tests/lab-04/ActionsTaken.test.tsx > ActionsTaken (UI-03) > UI-03: lists actions in chronological order (actionAt, then id), with status badges and Locked rows 759ms
+ ✓ tests/lab-04/ActionsTaken.test.tsx > ActionsTaken (UI-03) > UI-03: create requires a Follow-up Note when follow-up is checked, and posts the documented body 1165ms
+ ✓ tests/lab-04/ActionsTaken.test.tsx > ActionsTaken (UI-03) > UI-03: Save is busy-disabled, values are kept after a failure, and a retry reuses the same clientRequestId 368ms
+ ✓ tests/lab-02/CreateTicket.test.tsx > CreateTicket > UI-05/UI-06: busy state then success shows the returned ticket number 1666ms
+ ✓ tests/lab-04/ActionsTaken.test.tsx > ActionsTaken (UI-03) > UI-03: editing keeps the original seconds of actionAt when the minute is unchanged (PR #72 review) 183ms
+ ✓ tests/lab-04/ActionsTaken.test.tsx > ActionsTaken (UI-03) > UI-03: on the mobile sheet Tab and Shift+Tab stay inside the panel, Esc closes it and focus returns to the opener (PR #72 review) 318ms
+ ✓ tests/lab-04/ActionsTaken.test.tsx > ActionsTaken (UI-03) > UI-03: Complete asks for a Result before calling the API 230ms
+ ✓ tests/lab-04/ActionsTaken.test.tsx > ActionsTaken (UI-03) > UI-03: Cancel action opens an accessible confirmation dialog (Esc closes, focus returns to the opener) 410ms
+ ✓ tests/lab-02/CreateTicket.test.tsx > CreateTicket > UI-07: API failure shows an error banner and preserves entered values 1279ms
+ ✓ tests/lab-02/CreateTicket.test.tsx > CreateTicket > UI-08: oversized attachment is rejected client-side with an inline error 185ms
+ ✓ tests/lab-04/ActionsTaken.test.tsx > ActionsTaken (UI-03) > UI-03: while a panel is open the other rows cannot be opened (no unsaved draft is dropped); closing returns focus 395ms
+ ✓ tests/lab-04/ActionsTaken.test.tsx > ActionsTaken (UI-03) > UI-03: an edit refused with TICKET_NOT_ACTIVE keeps the typed text visible in the frozen panel 387ms
+ ✓ tests/lab-04/ActionsTaken.test.tsx > ActionsTaken (UI-03) > UI-03: a locked action opens read-only with only Close 150ms
+ ✓ tests/lab-04/ActionsTaken.test.tsx > ActionsTaken (UI-03) > UI-03: STALE_UPDATE shows the latest version and keeps my unsaved text; INVALID_ASSIGNEE shows under Performed by 515ms
+ ✓ tests/lab-04/ActionsTaken.test.tsx > ActionsTaken (UI-03) > UI-03: TICKET_NOT_ACTIVE shows the ui-spec message; IDEMPOTENCY_KEY_REUSED shows the saved action 419ms
+ ✓ tests/lab-04/ActionsTaken.test.tsx > ActionsTaken (UI-03) > UI-03: the Requester variant is read-only - no buttons, its own title, no Created by 26ms
+ ✓ tests/lab-03/UserManagement.test.tsx > UserManagement (UI-05) > lists users with name, email, role, status and an Edit action 577ms
+ ✓ tests/lab-03/UserManagement.test.tsx > UserManagement (UI-05) > sends the search term and the role filter to the API 637ms
+ ✓ tests/lab-03/UserManagement.test.tsx > UserManagement (UI-05) > distinguishes "no users" from "no matches for this search" 133ms
+ ✓ tests/lab-03/UserManagement.test.tsx > UserManagement (UI-05) > shows a retry banner when the list cannot be loaded 64ms
+ ✓ tests/lab-03/StaffTicketDetail.test.tsx > StaffTicketDetail (UI-04) > shows a Claim button (and no Reassign control) on an unassigned ticket 849ms
+ ✓ tests/lab-03/StaffTicketDetail.test.tsx > StaffTicketDetail (UI-04) > shows a Reassign control (and no Claim button) on an assigned ticket 141ms
+ ✓ tests/lab-03/UserManagement.test.tsx > UserManagement (UI-05) > creates a user, tells the admin where the password went, and closes the panel 826ms
+ ✓ tests/lab-03/StaffTicketDetail.test.tsx > StaffTicketDetail (UI-04) > Claim sends the ACTING user's id (not the requester's) plus expectedUpdatedAt 256ms
+ ✓ tests/lab-03/UserManagement.test.tsx > UserManagement (UI-05) > does not call the API when required fields are empty 311ms
+ ✓ tests/lab-03/StaffTicketDetail.test.tsx > StaffTicketDetail (UI-04) > Reassign sends the SELECTED user's id plus expectedUpdatedAt (not just Claim) 320ms
+ ✓ tests/lab-03/StaffTicketDetail.test.tsx > StaffTicketDetail (UI-04) > Reassign shows a refresh message on OWNERSHIP_CHANGED and reloads the ticket 290ms
+ ✓ tests/lab-03/StaffTicketDetail.test.tsx > StaffTicketDetail (UI-04) > Status select lists ONLY the legal next statuses, not every status 81ms
+ ✓ tests/lab-03/UserManagement.test.tsx > UserManagement (UI-05) > shows a duplicate-email error under the Email field 568ms
+ ✓ tests/lab-03/StaffTicketDetail.test.tsx > StaffTicketDetail (UI-04) > choosing CANCELLED asks for confirmation before calling the API 182ms
+ ✓ tests/lab-03/StaffTicketDetail.test.tsx > StaffTicketDetail (UI-04) > changing IT Priority calls the priority endpoint 91ms
+ ✓ tests/lab-03/UserManagement.test.tsx > UserManagement (UI-05) > locks Role and Active on the administrator's own account, and says why 144ms
+ ✓ tests/lab-03/StaffTicketDetail.test.tsx > StaffTicketDetail (UI-04) > keeps Internal Notes in a separate, labelled block - never interleaved with Public Comments 51ms
+ ✓ tests/lab-03/UserManagement.test.tsx > UserManagement (UI-05) > leaves Role and Active editable on another user 125ms
+ ✓ tests/lab-03/UserManagement.test.tsx > UserManagement (UI-05) > sends only the fields that changed 191ms
+ ✓ tests/lab-03/StaffTicketDetail.test.tsx > StaffTicketDetail (UI-04) > posting an Internal Note calls the notes endpoint (not the comments endpoint) 410ms
+ ✓ tests/lab-03/UserManagement.test.tsx > UserManagement (UI-05) > asks for confirmation before issuing a new initial password 314ms
+ ✓ tests/lab-03/UserManagement.test.tsx > UserManagement (UI-05) > closes the panel on Escape 273ms
+ ✓ tests/lab-03/StaffTicketDetail.test.tsx > StaffTicketDetail (UI-04) > posting a Public Comment uses the shared /tickets/:ticketNumber/comments endpoint (there is no /staff/.../comments route) 592ms
+ ✓ tests/lab-03/ChangePassword.test.tsx > ChangePassword (UI-02) > renders current, new, and confirm password fields 323ms
+ ✓ tests/lab-03/ChangePassword.test.tsx > ChangePassword (UI-02) > rejects a new password shorter than 8 characters without calling the API 687ms
+ ✓ tests/lab-03/ChangePassword.test.tsx > ChangePassword (UI-02) > rejects mismatched confirmation without calling the API 487ms
+ ✓ tests/lab-04/StaffDashboard.test.tsx > StaffDashboard (UI-01) > UI-01: renders the API values with "View all" links named after the metric and pointing at the drill-down 1837ms
+ ✓ tests/lab-03/ChangePassword.test.tsx > ChangePassword (UI-02) > on success, calls the API, refreshes the auth state, and navigates away 630ms
+ ✓ tests/lab-04/StaffDashboard.test.tsx > StaffDashboard (UI-01) > UI-01: the User Accounts card (sent by the API to Administrators only) links to User Management filtered by role and status 388ms
+ ✓ tests/lab-04/StaffDashboard.test.tsx > StaffDashboard (UI-01) > UI-01: shows an aria-busy skeleton while loading, then the empty texts for zero values and empty lists 182ms
+ ✓ tests/lab-03/ChangePassword.test.tsx > ChangePassword (UI-02) > shows a server-side field error under Current Password (e.g. wrong current password) 442ms
+ ✓ tests/lab-04/StaffDashboard.test.tsx > StaffDashboard (UI-01) > UI-01: a failure shows the safe message and Retry recovers; Refresh reloads 559ms
+ ✓ tests/lab-04/TicketWorkflow.test.tsx > TicketWorkflow (UI-04) > UI-04: offers only the legal targets, with Resolved disabled and the gate reason when blocked 433ms
+ ✓ tests/lab-04/TicketWorkflow.test.tsx > TicketWorkflow (UI-04) > UI-04: an unowned ticket gives the "Assign a Ticket Owner first." reason 41ms
+ ✓ tests/lab-03/Login.test.tsx > Login (UI-01) > renders email and password fields 120ms
+ ✓ tests/lab-04/TicketWorkflow.test.tsx > TicketWorkflow (UI-04) > UI-04: a RESOLUTION_BLOCKED rejection shows the server message, resets the select and reloads 123ms
+ ✓ tests/lab-04/TicketWorkflow.test.tsx > TicketWorkflow (UI-04) > UI-04: success sends expectedUpdatedAt and refreshes badge, resolved date, history and the success callout 239ms
+ ✓ tests/lab-04/TicketWorkflow.test.tsx > TicketWorkflow (UI-04) > UI-04: after a network error the chosen status stays selected and Retry sends it again (PR #72 review) 470ms
+ ✓ tests/lab-03/Login.test.tsx > Login (UI-01) > disables the submit button while the request is in flight 1078ms
+ ✓ tests/lab-04/TicketWorkflow.test.tsx > TicketWorkflow (UI-04) > UI-04: after cancelling the ticket, focus moves to the status message, not the disabled select (PR #72 review) 359ms
+ ✓ tests/lab-04/TicketWorkflow.test.tsx > TicketWorkflow (UI-04) > UI-04: the awaiting-review banner shows when the Requester says resolved on an active ticket 81ms
+ ✓ tests/lab-03/Login.test.tsx > Login (UI-01) > shows a generic failure banner on invalid credentials 644ms
+ ✓ tests/lab-04/TicketWorkflow.test.tsx > TicketWorkflow (UI-04) > UI-04: the cancel dialog mentions open actions only when there are some, and the actions reload after the cancel 432ms
+ ✓ tests/lab-03/StaffTicketQueue.test.tsx > StaffTicketQueue (UI-03) > renders search, filter, and pagination controls once data loads 244ms
+ ✓ tests/lab-03/StaffTicketQueue.test.tsx > StaffTicketQueue (UI-03) > shows the empty state when there are no tickets at all 47ms
+ ✓ tests/lab-03/StaffTicketQueue.test.tsx > StaffTicketQueue (UI-03) > shows a distinct no-results state (not the empty state) when filters yield nothing 1233ms
+ ✓ tests/lab-04/RequesterDashboard.test.tsx > RequesterDashboard (UI-02) > UI-02: shows the 4 cards with API values and drill-downs, the attention and recent lists, and quick actions 1518ms
+ ✓ tests/lab-04/RequesterDashboard.test.tsx > RequesterDashboard (UI-02) > UI-02: a Requester with no tickets sees zeros and the empty texts 261ms
+ ✓ tests/lab-03/StaffTicketQueue.test.tsx > StaffTicketQueue (UI-03) > sends the ownership=mine filter when selected 319ms
+ ✓ tests/lab-03/StaffTicketQueue.test.tsx > StaffTicketQueue (UI-03) > shows a retry banner on API failure 148ms
+ ✓ tests/lab-04/RequesterDashboard.test.tsx > RequesterDashboard (UI-02) > UI-02: a failure shows the safe message and Retry recovers 384ms
+ ✓ tests/lab-03/RequesterTicketDetail.test.tsx > RequesterTicketDetail - Public Comments + Problem Appears Resolved (UI-06) > renders the existing Public Comments thread 211ms
+ ✓ tests/lab-04/DrillDown.test.tsx > Drill-down filters (UI-05) > UI-05: My Tickets applies status list + resolvedWithinDays from the URL, shows the chip, and Clear Filters removes it 1095ms
+ ✓ tests/lab-04/DrillDown.test.tsx > Drill-down filters (UI-05) > UI-05: the Ticket Queue applies ownership, status list, priority NONE and requesterResolved; removing the chip clears them 234ms
+ ✓ tests/lab-03/RequesterTicketDetail.test.tsx > RequesterTicketDetail - Public Comments + Problem Appears Resolved (UI-06) > posts a new comment and refreshes the thread 1375ms
+ ✓ tests/lab-04/DrillDown.test.tsx > Drill-down filters (UI-05) > UI-05: User Management applies role and isActive from the URL and Clear removes them 160ms
+ ✓ tests/lab-04/DrillDown.test.tsx > Drill-down filters (UI-05) > UI-05: the chip disappears as soon as the filters no longer match the dashboard link (PR #73 review) 149ms
+ ✓ tests/lab-04/DrillDown.test.tsx > Drill-down filters (UI-05) > UI-05: without dashboard parameters there is no chip 53ms
+ ✓ tests/lab-03/RequesterTicketDetail.test.tsx > RequesterTicketDetail - Public Comments + Problem Appears Resolved (UI-06) > "Problem Appears Resolved" toggles to a confirmed, disabled state once used 206ms
+ ✓ tests/lab-03/fieldStyles.style.test.tsx > Editable vs read-only field styling (STYLE-03) > StaffTicketDetail: Ticket Number/Category/Related System/Requester/Summary/Description use zg-readonly-field 236ms
+ ✓ tests/lab-03/fieldStyles.style.test.tsx > Editable vs read-only field styling (STYLE-03) > StaffTicketDetail: IT Priority and Current Status are real editable controls, not read-only fields 84ms
+ ✓ tests/lab-04/dashboardCards.style.test.tsx > Dashboard cards and Action panel fields (STYLE-02) > STYLE-02: a metric card is zg-card zg-metric with an h2 label, a live value and a named link 610ms
+ ✓ tests/lab-04/dashboardCards.style.test.tsx > Dashboard cards and Action panel fields (STYLE-02) > STYLE-02: locked action fields use zg-readonly-field; errors use zg-field-error under their field 413ms
+ ✓ tests/lab-03/fieldStyles.style.test.tsx > Editable vs read-only field styling (STYLE-03) > UserManagement create panel: Full Name/Email/Role are real editable controls (form-control/form-select) 947ms
+ ✓ tests/lab-04/actionBadges.style.test.tsx > Action badges (ui-spec sec 1) > STYLE-01: each new badge uses the ui-spec sec 1 token pair 14ms
+ ✓ tests/lab-04/actionBadges.style.test.tsx > Action badges (ui-spec sec 1) > STYLE-01: badges keep the shared pill shape and always carry a text label 135ms
+ ✓ tests/lab-03/threadStyles.style.test.tsx > Public Comments vs Internal Notes styling (STYLE-02) > the Internal Notes block has its own distinct label, never present in the Public Comments thread 377ms
+ ✓ tests/lab-03/threadStyles.style.test.tsx > Public Comments vs Internal Notes styling (STYLE-02) > the Internal Notes container uses non-default background/border styling (never bare/unstyled) 46ms
+ ✓ tests/lab-03/threadStyles.style.test.tsx > Public Comments vs Internal Notes styling (STYLE-02) > a Public Comment and an Internal Note are never inside the same container element 69ms
+ ✓ tests/lab-03/badges.style.test.tsx > Badge tokens (STYLE-01) > zg-badge-status-new has a background and text color rule 4ms
+ ✓ tests/lab-03/badges.style.test.tsx > Badge tokens (STYLE-01) > zg-badge-status-open has a background and text color rule 1ms
+ ✓ tests/lab-03/badges.style.test.tsx > Badge tokens (STYLE-01) > zg-badge-status-in_progress has a background and text color rule 1ms
+ ✓ tests/lab-03/badges.style.test.tsx > Badge tokens (STYLE-01) > zg-badge-status-waiting_for_requester has a background and text color rule 1ms
+ ✓ tests/lab-03/badges.style.test.tsx > Badge tokens (STYLE-01) > zg-badge-status-resolved has a background and text color rule 1ms
+ ✓ tests/lab-03/badges.style.test.tsx > Badge tokens (STYLE-01) > zg-badge-status-closed has a background and text color rule 1ms
+ ✓ tests/lab-03/badges.style.test.tsx > Badge tokens (STYLE-01) > zg-badge-status-reopened has a background and text color rule 1ms
+ ✓ tests/lab-03/badges.style.test.tsx > Badge tokens (STYLE-01) > zg-badge-status-cancelled has a background and text color rule 1ms
+ ✓ tests/lab-03/badges.style.test.tsx > Badge tokens (STYLE-01) > zg-badge-priority-low has a background and text color rule 1ms
+ ✓ tests/lab-03/badges.style.test.tsx > Badge tokens (STYLE-01) > zg-badge-priority-medium has a background and text color rule 1ms
+ ✓ tests/lab-03/badges.style.test.tsx > Badge tokens (STYLE-01) > zg-badge-priority-high has a background and text color rule 1ms
+ ✓ tests/lab-03/badges.style.test.tsx > Badge tokens (STYLE-01) > zg-badge-role-requester has a background and text color rule 1ms
+ ✓ tests/lab-03/badges.style.test.tsx > Badge tokens (STYLE-01) > zg-badge-role-it_staff has a background and text color rule 0ms
+ ✓ tests/lab-03/badges.style.test.tsx > Badge tokens (STYLE-01) > zg-badge-role-administrator has a background and text color rule 0ms
+ ✓ tests/lab-03/badges.style.test.tsx > Badge tokens (STYLE-01) > zg-badge-active-true and zg-badge-active-false both have rules 1ms
+ ✓ tests/lab-03/badges.style.test.tsx > Badge tokens (STYLE-01) > every status has a distinct label text (color alone never carries the meaning, ui-spec.md sec 11) 1ms
+ ✓ tests/lab-03/badges.style.test.tsx > Badge tokens (STYLE-01) > the 4 Lab 3 statuses (WAITING_FOR_REQUESTER, CLOSED, REOPENED, CANCELLED) are each distinct from every Lab 2 status and from each other 4ms
+ ✓ tests/lab-03/badges.style.test.tsx > Badge tokens (STYLE-01) > every priority badge is visually distinct from every other priority badge 1ms
+ ✓ tests/lab-03/badges.style.test.tsx > Badge tokens (STYLE-01) > every role badge is visually distinct from every other role badge 1ms
+ ✓ tests/lab-03/badges.style.test.tsx > Badge tokens (STYLE-01) > active and inactive badges are visually distinct from each other 0ms
+
+ Test Files  17 passed (17)
+      Tests  106 passed (106)
+   Start at  20:05:12
+   Duration  53.98s (transform 2.17s, setup 5.56s, import 8.00s, tests 36.98s, environment 43.62s)
+
+# ------------------------------------------------------------
+# Exit code: 0
